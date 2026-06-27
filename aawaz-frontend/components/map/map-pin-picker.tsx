@@ -5,6 +5,7 @@ import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { Crosshair, MapPin } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
+import "leaflet/dist/leaflet.css";
 
 interface Location {
   lat: number;
@@ -54,28 +55,24 @@ export function MapPinPicker({
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState(
-    disabled
-      ? "Showing recorded location on OpenStreetMap."
-      : "Tap the map or allow location access to choose a location.",
+    selectedLocation
+      ? "Showing selected incident location."
+      : disabled
+        ? "Showing recorded location on OpenStreetMap."
+        : "Tap the map or allow location access to choose a location.",
   );
   const [attemptingLocation, setAttemptingLocation] = useState(false);
   const onLocationSelectRef = useRef(onLocationSelect);
-  onLocationSelectRef.current = onLocationSelect;
+
+  const displayPosition = selectedLocation ?? selectedPosition;
 
   const markerIcon = useMemo(() => {
     return L.icon({
-      iconUrl: new URL(
-        "leaflet/dist/images/marker-icon.png",
-        import.meta.url,
-      ).toString(),
-      iconRetinaUrl: new URL(
-        "leaflet/dist/images/marker-icon-2x.png",
-        import.meta.url,
-      ).toString(),
-      shadowUrl: new URL(
-        "leaflet/dist/images/marker-shadow.png",
-        import.meta.url,
-      ).toString(),
+      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      iconRetinaUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+      shadowUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       iconSize: [25, 41],
       iconAnchor: [12, 41],
       shadowSize: [41, 41],
@@ -83,15 +80,14 @@ export function MapPinPicker({
   }, []);
 
   useEffect(() => {
-    if (selectedLocation) {
-      setSelectedPosition(selectedLocation);
-      setMapCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng });
-      setStatusMessage("Showing selected incident location.");
-      return;
-    }
+    onLocationSelectRef.current = onLocationSelect;
+  });
 
-    if (disabled) return;
-  }, [disabled, selectedLocation]);
+  useEffect(() => {
+    if (!selectedLocation) return;
+    setMapCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng });
+    setStatusMessage("Showing selected incident location.");
+  }, [selectedLocation]);
 
   useEffect(() => {
     if (disabled || selectedLocation) return;
@@ -247,9 +243,9 @@ export function MapPinPicker({
                   },
                 }}
               />
-              {selectedPosition ? (
+              {displayPosition ? (
                 <Marker
-                  position={[selectedPosition.lat, selectedPosition.lng]}
+                  position={[displayPosition.lat, displayPosition.lng]}
                   icon={markerIcon}
                 />
               ) : null}
