@@ -24,6 +24,7 @@ const badgeVariants = cva(
         assigned: "border-[oklch(0.78_0.035_132)] bg-[oklch(0.93_0.02_132)] text-[oklch(0.34_0.04_132)] dark:border-[oklch(0.48_0.04_132)] dark:bg-[oklch(0.31_0.026_132)] dark:text-[oklch(0.82_0.045_132)]",
         investigation: "border-[oklch(0.76_0.035_318)] bg-[oklch(0.92_0.018_318)] text-[oklch(0.35_0.04_318)] dark:border-[oklch(0.48_0.04_318)] dark:bg-[oklch(0.31_0.025_318)] dark:text-[oklch(0.82_0.04_318)]",
         resolved: "border-[oklch(0.77_0.04_132)] bg-secondary text-secondary-foreground dark:border-[oklch(0.5_0.045_132)]",
+        closed: "border-border bg-muted text-muted-foreground/75",
         priority: "bg-priority text-priority-foreground",
       },
     },
