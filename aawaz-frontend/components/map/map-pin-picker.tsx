@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { Crosshair, MapPin } from "@phosphor-icons/react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Location {
   lat: number;
@@ -46,10 +47,12 @@ export function MapPinPicker({
   selectedLocation,
   disabled = false,
 }: MapPinPickerProps) {
-  const [mapCenter, setMapCenter] = useState(defaultCenter);
+  const [mapCenter, setMapCenter] = useState(selectedLocation ?? defaultCenter);
   const [selectedPosition, setSelectedPosition] = useState<
     Location | undefined
   >(selectedLocation);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState(
     disabled
       ? "Showing recorded location on OpenStreetMap."
@@ -196,27 +199,71 @@ export function MapPinPicker({
       </div>
 
       <div className="relative h-72 w-full overflow-hidden rounded-xl border border-border">
-        <MapContainer
-          center={[mapCenter.lat, mapCenter.lng]}
-          zoom={DEFAULT_ZOOM}
-          scrollWheelZoom={!disabled}
-          zoomControl={!disabled}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          />
-          {selectedPosition ? (
-            <Marker
-              position={[selectedPosition.lat, selectedPosition.lng]}
-              icon={markerIcon}
-            />
-          ) : null}
-          {!disabled && (
-            <MapClickHandler onLocationSelect={handleMapSelection} />
-          )}
-        </MapContainer>
+        {mapError ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-background px-4 text-center text-sm text-foreground">
+            <div className="text-lg font-semibold">Map failed to load</div>
+            <p className="text-xs text-muted-foreground max-w-sm">{mapError}</p>
+            {selectedPosition ? (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Coordinates</p>
+                <p className="font-mono text-sm">
+                  {selectedPosition.lat.toFixed(6)},{" "}
+                  {selectedPosition.lng.toFixed(6)}
+                </p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${selectedPosition.lat},${selectedPosition.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-medium text-primary underline"
+                >
+                  Open in Google Maps
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No location coordinates are available for this report.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="relative h-full w-full">
+            <MapContainer
+              center={[mapCenter.lat, mapCenter.lng]}
+              zoom={DEFAULT_ZOOM}
+              scrollWheelZoom={!disabled}
+              zoomControl={!disabled}
+              style={{ height: "100%", width: "100%" }}
+              whenReady={() => setIsMapLoaded(true)}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/">CARTO</a>'
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                eventHandlers={{
+                  tileerror: () => {
+                    console.warn("[MapPinPicker] map tile load failed");
+                    setMapError(
+                      "Unable to load map tiles. Please check your connection.",
+                    );
+                  },
+                }}
+              />
+              {selectedPosition ? (
+                <Marker
+                  position={[selectedPosition.lat, selectedPosition.lng]}
+                  icon={markerIcon}
+                />
+              ) : null}
+              {!disabled && (
+                <MapClickHandler onLocationSelect={handleMapSelection} />
+              )}
+            </MapContainer>
+            {!isMapLoaded && (
+              <div className="absolute inset-0 z-10">
+                <Skeleton className="h-full w-full" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {!disabled && (

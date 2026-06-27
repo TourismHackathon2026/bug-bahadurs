@@ -2,7 +2,7 @@ import { ComplaintStatus, Priority, ComplaintCategory } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { generateReferenceNumber } from "@/lib/factory";
 import { routeComplaint } from "@/server/routing";
-import { sseEmitter } from "@/lib/sse-emitter";
+import { notifyInTx } from "@/services/notification";
 
 export interface Complaint {
   id: string;
@@ -82,7 +82,12 @@ export async function createComplaint(data: {
         authorityType: routedAuthorityType,
       },
     },
-    select: { id: true },
+    select: { id: true, email: true, displayName: true },
+  });
+
+  const tourist = await prisma.user.findUnique({
+    where: { id: data.touristId },
+    select: { email: true, displayName: true },
   });
 
   const status = assignedOfficer ? "ASSIGNED" : "SUBMITTED";
@@ -138,49 +143,38 @@ export async function createComplaint(data: {
       });
     }
 
-    // Create notifications
-    // 1. Tourist notification
-    await tx.notification.create({
-      data: {
-        userId: data.touristId,
-        complaintId: created.id,
-        type: "COMPLAINT_SUBMITTED",
-        title: "Complaint submitted successfully",
-        body: `Your complaint ${referenceNo} has been submitted and is routed to ${routedAuthorityType.replace("_", " ")}.`,
-        isRead: false,
-      },
+    await notifyInTx(tx, {
+      userId: data.touristId,
+      complaintId: created.id,
+      type: "COMPLAINT_SUBMITTED",
+      title: "Complaint submitted successfully",
+      body: `Your complaint ${referenceNo} has been submitted and is routed to ${routedAuthorityType.replace("_", " ")}.`,
+      email: tourist?.email
+        ? {
+            to: tourist.email,
+            subject: "Complaint Submitted Successfully",
+            text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${referenceNo} has been submitted successfully and is routed to ${routedAuthorityType.replace("_", " ")}.\n\nYou will be notified when there are updates.`,
+          }
+        : undefined,
     });
 
-    // 2. Authority notification if assigned
     if (assignedOfficer) {
-      await tx.notification.create({
-        data: {
-          userId: assignedOfficer.id,
-          complaintId: created.id,
-          type: "NEW_ASSIGNMENT",
-          title: "New complaint assigned",
-          body: `A new complaint ${referenceNo} has been assigned to you.`,
-          isRead: false,
+      await notifyInTx(tx, {
+        userId: assignedOfficer.id,
+        complaintId: created.id,
+        type: "NEW_ASSIGNMENT",
+        title: "New complaint assigned",
+        body: `A new complaint ${referenceNo} has been assigned to you.`,
+        email: {
+          to: assignedOfficer.email,
+          subject: "New Complaint Assigned",
+          text: `Dear ${assignedOfficer.displayName},\n\nA new complaint ${referenceNo} has been assigned to you.\n\nPlease review and take necessary action.`,
         },
       });
     }
 
     return created;
   });
-
-  // SSE Emit for tourist
-  sseEmitter.emit(data.touristId, "NEW_NOTIFICATION", {
-    title: "Complaint submitted successfully",
-    body: `Your complaint ${referenceNo} has been submitted.`,
-  });
-
-  // SSE Emit for authority
-  if (assignedOfficer) {
-    sseEmitter.emit(assignedOfficer.id, "NEW_NOTIFICATION", {
-      title: "New complaint assigned",
-      body: `A new complaint ${referenceNo} has been assigned to you.`,
-    });
-  }
 
   return complaint;
 }
@@ -424,6 +418,11 @@ export async function updateComplaintStatus(
     throw new Error("Complaint is not assigned to this authority");
   }
 
+  const tourist = await prisma.user.findUnique({
+    where: { id: complaint.touristId },
+    select: { email: true, displayName: true },
+  });
+
   const updated = await prisma.$transaction(async (tx) => {
     const saved = await tx.complaint.update({
       where: { id },
@@ -441,27 +440,22 @@ export async function updateComplaintStatus(
       },
     });
 
-    await tx.notification.create({
-      data: {
-        userId: complaint.touristId,
-        complaintId: id,
-        type: status === "RESOLVED" ? "RESOLVED" : "STATUS_CHANGED",
-        title:
-          status === "RESOLVED"
-            ? "Complaint resolved"
-            : "Complaint status updated",
-        body: `Your complaint ${complaint.referenceNo} is now ${status.replaceAll("_", " ").toLowerCase()}.`,
-        isRead: false,
-      },
+    await notifyInTx(tx, {
+      userId: complaint.touristId,
+      complaintId: id,
+      type: status === "RESOLVED" ? "RESOLVED" : "STATUS_CHANGED",
+      title: status === "RESOLVED" ? "Complaint resolved" : "Complaint status updated",
+      body: `Your complaint ${complaint.referenceNo} is now ${status.replaceAll("_", " ").toLowerCase()}.`,
+      email: tourist?.email
+        ? {
+            to: tourist.email,
+            subject: status === "RESOLVED" ? "Complaint Resolved" : "Complaint Status Updated",
+            text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${complaint.referenceNo} has been updated to ${status.replaceAll("_", " ").toLowerCase()}.\n\nYou can check the details in your dashboard.`,
+          }
+        : undefined,
     });
 
     return saved;
-  });
-
-  sseEmitter.emit(complaint.touristId, "NEW_NOTIFICATION", {
-    title:
-      status === "RESOLVED" ? "Complaint resolved" : "Complaint status updated",
-    body: `Your complaint ${complaint.referenceNo} is now ${status.replaceAll("_", " ").toLowerCase()}.`,
   });
 
   return updated;

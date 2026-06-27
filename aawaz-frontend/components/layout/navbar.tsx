@@ -45,7 +45,7 @@ export async function Navbar() {
           {session ? (
             <>
               <Badge variant="secondary" className="hidden sm:inline-flex">{session.role}</Badge>
-              <NotificationBell unreadCount={3} />
+              <NotificationBell />
               <Avatar className="size-10 ring-2 ring-background shadow-[0_10px_24px_oklch(0.14_0.018_248_/_0.12)]">
                 <AvatarFallback>{getInitials(session.displayName)}</AvatarFallback>
               </Avatar>

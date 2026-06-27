@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { PriorityBadge } from "@/components/ui/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPinPicker } from "@/components/map/map-pin-picker";
+import { MapPinPickerLazy as MapPinPicker } from "@/components/map/map-pin-picker-lazy";
 import {
   ArrowLeft,
   Images,

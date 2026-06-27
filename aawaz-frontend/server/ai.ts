@@ -1,7 +1,7 @@
 import { ComplaintCategory, Priority } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { routeComplaint } from "@/server/routing";
-import { sseEmitter } from "@/lib/sse-emitter";
+import { notifyInTx } from "@/services/notification";
 
 const NVIDIA_API_URL =
   process.env.NVIDIA_API_URL ??
@@ -214,6 +214,11 @@ export async function categorizeComplaint(
     return null;
   }
 
+  const tourist = await prisma.user.findUnique({
+    where: { id: complaint.touristId },
+    select: { email: true, displayName: true },
+  });
+
   const aiAuthorityType = routeComplaint(aiResult.category);
 
   const currentAssignedOfficer = complaint.assignedToId
@@ -227,6 +232,8 @@ export async function categorizeComplaint(
     currentAssignedOfficer?.authorityProfile?.authorityType;
   let assignedOfficerId = complaint.assignedToId;
 
+  let newOfficerEmail: string | undefined
+  let newOfficerName: string | undefined
   if (!assignedOfficerId || currentAuthorityType !== aiAuthorityType) {
     const targetOfficer = await prisma.user.findFirst({
       where: {
@@ -235,11 +242,13 @@ export async function categorizeComplaint(
           authorityType: aiAuthorityType,
         },
       },
-      select: { id: true },
+      select: { id: true, email: true, displayName: true },
     });
 
     if (targetOfficer) {
       assignedOfficerId = targetOfficer.id;
+      newOfficerEmail = targetOfficer.email;
+      newOfficerName = targetOfficer.displayName;
     }
   }
 
@@ -274,44 +283,38 @@ export async function categorizeComplaint(
       data: updateData,
     });
 
-    await tx.notification.create({
-      data: {
-        userId: complaint.touristId,
-        complaintId: id,
-        type: "STATUS_CHANGED",
-        title: "AI categorization completed",
-        body: `Your complaint ${complaint.referenceNo} was categorized by AI as ${aiResult.category.replaceAll("_", " ")}.`,
-        isRead: false,
-      },
+    await notifyInTx(tx, {
+      userId: complaint.touristId,
+      complaintId: id,
+      type: "STATUS_CHANGED",
+      title: "AI categorization completed",
+      body: `Your complaint ${complaint.referenceNo} was categorized by AI as ${aiResult.category.replaceAll("_", " ")}.`,
+      email: tourist?.email
+        ? {
+            to: tourist.email,
+            subject: "Complaint Categorized by AI",
+            text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${complaint.referenceNo} has been analyzed by our AI system and categorized as ${aiResult.category.replaceAll("_", " ")}.\n\nYou can check the details in your dashboard.`,
+          }
+        : undefined,
     });
 
     if (assignedOfficerId && assignedOfficerId !== complaint.assignedToId) {
-      await tx.notification.create({
-        data: {
-          userId: assignedOfficerId,
-          complaintId: id,
-          type: "NEW_ASSIGNMENT",
-          title: "Complaint reassigned by AI",
-          body: `A complaint was routed to your authority based on AI triage.`,
-          isRead: false,
-        },
+      await notifyInTx(tx, {
+        userId: assignedOfficerId,
+        complaintId: id,
+        type: "NEW_ASSIGNMENT",
+        title: "Complaint reassigned by AI",
+        body: `A complaint was routed to your authority based on AI triage.`,
+        email: newOfficerEmail
+          ? {
+              to: newOfficerEmail,
+              subject: "Complaint Assigned by AI Triage",
+              text: `Dear ${newOfficerName ?? "Officer"},\n\nA complaint has been routed to your department by our AI triage system.\n\nPlease review it in your dashboard.`,
+            }
+          : undefined,
       });
     }
   });
-
-  sseEmitter.emit(complaint.touristId, "AI_CATEGORIZATION_COMPLETE", {
-    complaintId: id,
-    aiCategory: aiResult.category,
-    aiConfidence: aiResult.confidence,
-    authorityType: aiAuthorityType,
-  });
-
-  if (assignedOfficerId && assignedOfficerId !== complaint.assignedToId) {
-    sseEmitter.emit(assignedOfficerId, "NEW_NOTIFICATION", {
-      title: "Complaint reassigned by AI",
-      body: `A complaint was routed to your authority based on AI triage.`,
-    });
-  }
 
   console.log(
     "[Service:AI] categorizeComplaint COMPLETE - complaint:",

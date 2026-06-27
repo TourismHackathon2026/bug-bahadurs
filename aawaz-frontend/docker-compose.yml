@@ -32,7 +32,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  mailpit:
+    image: axllent/mailpit:edge
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    volumes:
+      - mailpit-data:/data
 volumes:
   postgres_data:
   redis_data:
+  mailpit-data:

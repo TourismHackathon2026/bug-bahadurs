@@ -9,6 +9,8 @@ import { NotificationType, RegistrationStatus, Role } from "@/lib/constants"
 import { hashPassword, verifyPassword } from "@/lib/password"
 import { prisma } from "@/lib/prisma"
 import { clearSession, setSession } from "@/lib/session"
+import { sseEmitter } from "@/lib/sse-emitter"
+import { invalidateCache } from "@/lib/redis"
 
 const registerSchema = z.object({
   email: z.string().trim().email(),
@@ -96,6 +98,18 @@ export async function registerTourist(formData: FormData): Promise<ActionResult>
             isRead: false,
           })),
         })
+
+        for (const admin of adminUsers) {
+          sseEmitter.emit(admin.id, "NEW_NOTIFICATION", {
+            type: NotificationType.REGISTRATION_SUBMITTED,
+            title: "New tourist registration",
+            body: `${parsed.data.displayName} submitted a registration request.`,
+          })
+        }
+
+        await Promise.all(
+          adminUsers.map((a) => invalidateCache(`notifications:${a.id}:*`)),
+        )
       }
     })
 

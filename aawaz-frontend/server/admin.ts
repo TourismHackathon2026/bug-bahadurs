@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { Role, RegistrationStatus, NotificationType } from "@/lib/constants"
 import { generateLoginId } from "@/lib/factory"
-import { sseEmitter } from "@/lib/sse-emitter"
+import { notifyInTx } from "@/services/notification"
 
 export interface PendingRegistration {
   id: string
@@ -82,32 +82,17 @@ export async function approveTouristRegistration(userId: string): Promise<{ succ
         data: { status: RegistrationStatus.APPROVED },
       })
 
-      // 3. Create notification for the approved tourist
-      await tx.notification.create({
-        data: {
-          userId,
-          type: NotificationType.REGISTRATION_APPROVED,
-          title: "Registration Approved",
-          body: `Your Awaaz registration has been approved. Your numeric Login ID is: ${loginId}`,
-          isRead: false,
+      await notifyInTx(tx, {
+        userId,
+        type: NotificationType.REGISTRATION_APPROVED,
+        title: "Registration Approved",
+        body: `Your Awaaz registration has been approved. Your numeric Login ID is: ${loginId}`,
+        email: {
+          to: user.email,
+          subject: "Your Awaaz Registration is Approved!",
+          text: `Dear ${user.displayName},\n\nYour registration request has been approved.\nYour numeric Login ID is: ${loginId}\n\nPlease use this Login ID and your password to sign in.`,
         },
       })
-    })
-
-    // Log the generated credentials to the console (acting as mock email delivery)
-    console.log(`\n==================================================`);
-    console.log(`[EMAIL DISPATCH] To: ${user.email}`);
-    console.log(`Subject: Your Awaaz Registration is Approved!`);
-    console.log(`Dear ${user.displayName},`);
-    console.log(`Your registration request has been approved.`);
-    console.log(`Your numeric Login ID is: ${loginId}`);
-    console.log(`Please use this Login ID and your password to sign in.`);
-    console.log(`==================================================\n`);
-
-    // Emit event via SSE (in case they have an active stream, e.g. open tab)
-    sseEmitter.emit(userId, "NEW_NOTIFICATION", {
-      title: "Registration Approved",
-      body: `Your Awaaz registration has been approved. Login ID: ${loginId}`,
     })
 
     return { success: true, loginId }
@@ -147,22 +132,17 @@ export async function rejectTouristRegistration(userId: string, reason: string):
         },
       })
 
-      // 2. Create notification for the rejected tourist
-      await tx.notification.create({
-        data: {
-          userId,
-          type: NotificationType.REGISTRATION_REJECTED,
-          title: "Registration Rejected",
-          body: `Your registration request was rejected. Reason: ${reason}`,
-          isRead: false,
+      await notifyInTx(tx, {
+        userId,
+        type: NotificationType.REGISTRATION_REJECTED,
+        title: "Registration Rejected",
+        body: `Your registration request was rejected. Reason: ${reason}`,
+        email: {
+          to: user.email,
+          subject: "Your Awaaz Registration was Rejected",
+          text: `Dear ${user.displayName},\n\nYour registration request was rejected.\nReason: ${reason}\n\nIf you have any questions, please contact support.`,
         },
       })
-    })
-
-    // Emit event via SSE
-    sseEmitter.emit(userId, "NEW_NOTIFICATION", {
-      title: "Registration Rejected",
-      body: `Your registration request was rejected. Reason: ${reason}`,
     })
 
     return { success: true }

@@ -1,5 +1,5 @@
-// ★ Repository pattern — all DB access for notifications lives here
-import { NotificationType } from "@/lib/constants"
+import { prisma } from "@/lib/prisma"
+import type { NotificationType } from "@/lib/constants"
 
 export interface Notification {
   id: string
@@ -12,42 +12,42 @@ export interface Notification {
   createdAt: Date
 }
 
-export async function createNotification(data: {
-  userId: string
-  type: NotificationType
-  title: string
-  body: string
-  complaintId?: string
-}): Promise<Notification> {
-  console.log("[Repository:notifications] createNotification - not implemented", data)
-  throw new Error("Not yet implemented")
-}
-
 export async function getNotifications(
   userId: string,
   page: number,
-  limit: number
+  limit: number,
 ): Promise<{ notifications: Notification[]; total: number }> {
-  console.log(`[Repository:notifications] getNotifications for ${userId} - not implemented`)
-  return { notifications: [], total: 0 }
-}
+  const where = { userId }
 
-export async function getUnreadNotifications(userId: string): Promise<Notification[]> {
-  console.log(`[Repository:notifications] getUnreadNotifications for ${userId} - not implemented`)
-  return []
+  const [notifications, total] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.notification.count({ where }),
+  ])
+
+  return { notifications, total }
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
-  console.log(`[Repository:notifications] getUnreadCount for ${userId} - not implemented`)
-  return 0
+  return prisma.notification.count({
+    where: { userId, isRead: false },
+  })
 }
 
-export async function markAsRead(id: string): Promise<Notification> {
-  console.log(`[Repository:notifications] markAsRead for ${id} - not implemented`)
-  throw new Error("Not yet implemented")
+export async function markAsRead(id: string): Promise<void> {
+  await prisma.notification.update({
+    where: { id },
+    data: { isRead: true },
+  })
 }
 
 export async function markAllAsRead(userId: string): Promise<void> {
-  console.log(`[Repository:notifications] markAllAsRead for ${userId} - not implemented`)
-  throw new Error("Not yet implemented")
+  await prisma.notification.updateMany({
+    where: { userId, isRead: false },
+    data: { isRead: true },
+  })
 }

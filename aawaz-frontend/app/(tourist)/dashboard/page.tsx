@@ -5,6 +5,7 @@ import { FeedFilterBar } from "@/components/complaint/feed-filter-bar"
 import { ComplaintCard } from "@/components/complaint/complaint-card"
 import { ComplaintFeedSkeleton } from "@/components/complaint/complaint-feed-skeleton"
 import { getDashboardComplaints, getDashboardStats } from "@/actions/dashboard.actions"
+import type { ComplaintStatus, ComplaintCategory, Priority } from "@/lib/constants"
 
 export const metadata: Metadata = {
   title: "Dashboard | Awaaz",
@@ -32,13 +33,50 @@ async function DashboardStats() {
   )
 }
 
-async function ComplaintFeed() {
-  const { complaints } = await getDashboardComplaints({}, 1, 10)
+function parseFilters(searchParams: URLSearchParams): {
+  status?: ComplaintStatus[]
+  category?: ComplaintCategory
+  priority?: Priority
+  search?: string
+} {
+  const filters: ReturnType<typeof parseFilters> = {}
+
+  const status = searchParams.get("status")
+  if (status) {
+    filters.status = status.split(",").filter(Boolean) as ComplaintStatus[]
+  }
+
+  const priority = searchParams.get("priority")
+  if (priority) {
+    filters.priority = priority as Priority
+  }
+
+  const search = searchParams.get("search")
+  if (search?.trim()) {
+    filters.search = search.trim()
+  }
+
+  return filters
+}
+
+async function ComplaintFeed({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const sp = await searchParams
+  const urlParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(sp)) {
+    if (value) urlParams.set(key, Array.isArray(value) ? value.join(",") : value)
+  }
+  const filters = parseFilters(urlParams)
+  const { complaints } = await getDashboardComplaints(filters, 1, 10)
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold tracking-tight text-foreground">Complaint Feed</h2>
-      <FeedFilterBar activeFilters={["Active Cases"]} />
-      
+      <FeedFilterBar />
+
       <div className="grid gap-6 mt-4">
         {complaints.length > 0 ? (
           complaints.map((complaint) => (
@@ -54,10 +92,13 @@ async function ComplaintFeed() {
   )
 }
 
-export default function TouristDashboardPage() {
+export default async function TouristDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   return (
     <div className="space-y-8">
-      {/* Summary strip */}
       <Suspense
         fallback={
           <div className="grid gap-4 sm:grid-cols-4">
@@ -71,9 +112,9 @@ export default function TouristDashboardPage() {
       </Suspense>
 
       <FeedComposerCTA />
-      
+
       <Suspense fallback={<ComplaintFeedSkeleton />}>
-        <ComplaintFeed />
+        <ComplaintFeed searchParams={searchParams} />
       </Suspense>
     </div>
   )
