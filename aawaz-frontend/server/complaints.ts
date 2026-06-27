@@ -1,5 +1,8 @@
-// ★ Repository pattern — all DB access for complaints lives here
 import { ComplaintStatus, Priority, ComplaintCategory } from "@/lib/constants"
+import { prisma } from "@/lib/prisma"
+import { generateReferenceNumber } from "@/lib/factory"
+import { routeComplaint } from "@/server/routing"
+import { sseEmitter } from "@/lib/sse-emitter"
 
 export interface Complaint {
   id: string
@@ -49,8 +52,106 @@ export async function createComplaint(data: {
   locationLabel?: string
   touristId: string
 }): Promise<Complaint> {
-  console.log("[Repository:complaints] createComplaint - not implemented", data)
-  throw new Error("Not yet implemented")
+  const routedAuthorityType = routeComplaint(data.category)
+
+  // Find an active authority officer for the routed authority type
+  const assignedOfficer = await prisma.user.findFirst({
+    where: {
+      role: "AUTHORITY",
+      authorityProfile: {
+        authorityType: routedAuthorityType,
+      },
+    },
+    select: { id: true },
+  })
+
+  const status = assignedOfficer ? "ASSIGNED" : "SUBMITTED"
+  const referenceNo = generateReferenceNumber()
+
+  const complaint = await prisma.$transaction(async (tx) => {
+    const created = await tx.complaint.create({
+      data: {
+        referenceNo,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        priority: data.priority ?? "NORMAL",
+        incidentDate: data.incidentDate,
+        locationLat: data.locationLat ?? null,
+        locationLng: data.locationLng ?? null,
+        locationLabel: data.locationLabel ?? null,
+        touristId: data.touristId,
+        assignedToId: assignedOfficer?.id ?? null,
+        status,
+      },
+    })
+
+    // Create initial status event
+    await tx.statusEvent.create({
+      data: {
+        complaintId: created.id,
+        status: "SUBMITTED",
+        actorId: data.touristId,
+        note: "Complaint submitted",
+      },
+    })
+
+    if (assignedOfficer) {
+      await tx.statusEvent.create({
+        data: {
+          complaintId: created.id,
+          status: "ASSIGNED",
+          actorId: data.touristId,
+          note: `Automatically assigned to ${routedAuthorityType.replace("_", " ")}`,
+        },
+      })
+    }
+
+    // Create notifications
+    // 1. Tourist notification
+    await tx.notification.create({
+      data: {
+        userId: data.touristId,
+        complaintId: created.id,
+        type: "COMPLAINT_SUBMITTED",
+        title: "Complaint submitted successfully",
+        body: `Your complaint ${referenceNo} has been submitted and is routed to ${routedAuthorityType.replace("_", " ")}.`,
+        isRead: false,
+      },
+    })
+
+    // 2. Authority notification if assigned
+    if (assignedOfficer) {
+      await tx.notification.create({
+        data: {
+          userId: assignedOfficer.id,
+          complaintId: created.id,
+          type: "NEW_ASSIGNMENT",
+          title: "New complaint assigned",
+          body: `A new complaint ${referenceNo} has been assigned to you.`,
+          isRead: false,
+        },
+      })
+    }
+
+    return created
+  })
+
+  // SSE Emit for tourist
+  sseEmitter.emit(data.touristId, "NEW_NOTIFICATION", {
+    title: "Complaint submitted successfully",
+    body: `Your complaint ${referenceNo} has been submitted.`,
+  })
+
+  // SSE Emit for authority
+  if (assignedOfficer) {
+    sseEmitter.emit(assignedOfficer.id, "NEW_NOTIFICATION", {
+      title: "New complaint assigned",
+      body: `A new complaint ${referenceNo} has been assigned to you.`,
+    })
+  }
+
+  return complaint
 }
 
 export async function getComplaintById(id: string): Promise<Complaint | null> {

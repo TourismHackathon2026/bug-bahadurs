@@ -285,7 +285,7 @@ Videos
 Documents
 ```
 
-Stored using object storage.
+Stored using object storage(install and use uploadthing).
 
 Complaint detail page displays:
 
