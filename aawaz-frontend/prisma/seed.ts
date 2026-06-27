@@ -1,16 +1,16 @@
-import { prisma } from "../lib/prisma"
-import { hashPassword } from "../lib/password"
-
+import "dotenv/config";
+import { prisma } from "../lib/prisma";
+import { hashPassword } from "../lib/password";
 
 async function main() {
-  console.log("Seeding database...")
+  console.log("Seeding database...");
 
   // Delete existing users to ensure clean slate (optional, but good for hackathon)
   // Let's just update/create the admin user to prevent errors if running multiple times.
-  const adminEmail = "admin@awaaz.gov.np"
-  const adminLoginId = "99999999"
-  const adminPassword = "AdminPassword123"
-  const passwordHash = await hashPassword(adminPassword)
+  const adminEmail = "admin@awaaz.gov.np";
+  const adminLoginId = "99999999";
+  const adminPassword = "AdminPassword123";
+  const passwordHash = await hashPassword(adminPassword);
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
@@ -25,18 +25,38 @@ async function main() {
       displayName: "System Administrator",
       passwordHash,
     },
-  })
+  });
 
-  const authorityPassword = "12345678"
-  const authorityHash = await hashPassword(authorityPassword)
-  const authorityAccounts = [
-    { email: "nepalpolice@gmail.com", displayName: "Nepal Police", authorityType: "NEPAL_POLICE" },
-    { email: "trafficpolice@gmail.com", displayName: "Traffic Police", authorityType: "TRAFFIC_POLICE" },
-    { email: "tourismboard@gmail.com", displayName: "Tourism Board", authorityType: "TOURISM_BOARD" },
-    { email: "hotelassociation@gmail.com", displayName: "Hotel Association", authorityType: "HOTEL_ASSOCIATION" },
-  ]
+  const authorityPassword = "12345678";
+  const authorityHash = await hashPassword(authorityPassword);
+  const authorityAccounts: Array<{
+    email: string
+    displayName: string
+    authorityType: "NEPAL_POLICE" | "TRAFFIC_POLICE" | "TOURISM_BOARD" | "HOTEL_ASSOCIATION"
+  }> = [
+    {
+      email: "nepalpolice@gmail.com",
+      displayName: "Nepal Police",
+      authorityType: "NEPAL_POLICE",
+    },
+    {
+      email: "trafficpolice@gmail.com",
+      displayName: "Traffic Police",
+      authorityType: "TRAFFIC_POLICE",
+    },
+    {
+      email: "tourismboard@gmail.com",
+      displayName: "Tourism Board",
+      authorityType: "TOURISM_BOARD",
+    },
+    {
+      email: "hotelassociation@gmail.com",
+      displayName: "Hotel Association",
+      authorityType: "HOTEL_ASSOCIATION",
+    },
+  ];
 
-  const authorityUsers = []
+  const authorityUsers = [];
   for (const account of authorityAccounts) {
     const user = await prisma.user.upsert({
       where: { email: account.email },
@@ -51,7 +71,7 @@ async function main() {
         displayName: account.displayName,
         passwordHash: authorityHash,
       },
-    })
+    });
 
     await prisma.authorityProfile.upsert({
       where: { userId: user.id },
@@ -62,31 +82,31 @@ async function main() {
         userId: user.id,
         authorityType: account.authorityType,
       },
-    })
+    });
 
-    authorityUsers.push({ ...user, authorityType: account.authorityType })
+    authorityUsers.push({ ...user, authorityType: account.authorityType });
   }
 
-  console.log("\n==================================================")
-  console.log("Seeding Completed Successfully!")
-  console.log(`Admin User:`)
-  console.log(`- Login ID: ${admin.loginId}`)
-  console.log(`- Email:    ${admin.email}`)
-  console.log(`- Password: ${adminPassword}`)
-  console.log("\nAuthority Users:")
+  console.log("\n==================================================");
+  console.log("Seeding Completed Successfully!");
+  console.log(`Admin User:`);
+  console.log(`- Login ID: ${admin.loginId}`);
+  console.log(`- Email:    ${admin.email}`);
+  console.log(`- Password: ${adminPassword}`);
+  console.log("\nAuthority Users:");
   authorityUsers.forEach((user) => {
-    console.log(`- ${user.displayName}`)
-    console.log(`  Email: ${user.email}`)
-    console.log(`  Password: ${authorityPassword}`)
-  })
-  console.log("==================================================\n")
+    console.log(`- ${user.displayName}`);
+    console.log(`  Email: ${user.email}`);
+    console.log(`  Password: ${authorityPassword}`);
+  });
+  console.log("==================================================\n");
 }
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error(e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });

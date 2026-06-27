@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Instrument_Sans } from "next/font/google";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,7 +28,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${instrumentSans.variable} ${fraunces.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${instrumentSans.variable} ${fraunces.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
         <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
         <Toaster richColors closeButton position="top-right" />
