@@ -1,0 +1,388 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  TOURIST
+  AUTHORITY
+  ADMIN
+}
+
+enum AuthorityType {
+  NEPAL_POLICE
+  TOURISM_BOARD
+  HOTEL_ASSOCIATION
+  TRAFFIC_POLICE
+  MUNICIPALITY
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  CATEGORIZING
+  CATEGORIZED
+  UNDER_REVIEW
+  ASSIGNED
+  INVESTIGATION
+  RESOLVED
+}
+
+enum EvidenceType {
+  PHOTO
+  VIDEO
+  RECEIPT
+  SCREENSHOT
+}
+
+enum DocumentVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ContactType {
+  EMAIL
+  PHONE
+  SOCIAL
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TouristNotificationType {
+  COMPLAINT_SUBMITTED
+  STATUS_CHANGED
+  EVIDENCE_REQUESTED
+  RESOLVED
+  REGISTRATION_APPROVED
+  REGISTRATION_REJECTED
+}
+
+enum AuthorityNotificationType {
+  NEW_ASSIGNMENT
+  HIGH_PRIORITY_COMPLAINT
+  EVIDENCE_UPLOADED
+  TOURIST_REPLY
+  ESCALATED
+  OVERDUE_REVIEW
+}
+
+enum NotificationChannel {
+  WEB_SOCKET
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  role         Role
+  loginId      String   @unique @map("login_id")
+  passwordHash String   @map("password_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  touristProfile       TouristProfile?
+  authorityProfile     AuthorityProfile?
+  adminProfile         AdminProfile?
+  contactInformations  ContactInformation[]
+  uploadedEvidence     Evidence[]
+  statusEventChanges   StatusEvent[]
+  notificationDeliveries NotificationDelivery[]
+  notificationPreferences NotificationPreference[]
+
+  @@map("users")
+}
+
+model TouristProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  fullName  String   @map("full_name")
+  email     String
+  phone     String?
+
+  identityDocuments IdentityDocument[]
+  complaints        Complaint[]
+  notifications     TouristNotification[]
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tourist_profiles")
+}
+
+model AuthorityProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  authorityId String   @map("authority_id")
+  fullName    String   @map("full_name")
+  email       String
+  phone       String?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authority Authority @relation(fields: [authorityId], references: [id])
+  notifications AuthorityNotification[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("authority_profiles")
+}
+
+model AdminProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  fullName  String   @map("full_name")
+  email     String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_profiles")
+}
+
+model IdentityDocument {
+  id                      String                      @id @default(uuid())
+  touristProfileId        String                      @map("tourist_profile_id")
+  documentType            String                      @map("document_type")
+  documentReferenceNumber String                      @map("document_reference_number")
+  uploadUrl               String                      @map("upload_url")
+  verificationStatus      DocumentVerificationStatus  @default(PENDING) @map("verification_status")
+  adminRemark             String?                     @map("admin_remark")
+
+  touristProfile TouristProfile @relation(fields: [touristProfileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("identity_documents")
+}
+
+model ContactInformation {
+  id         String       @id @default(uuid())
+  userId     String       @map("user_id")
+  type       ContactType
+  value      String
+  isPrimary  Boolean      @default(false) @map("is_primary")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("contact_informations")
+}
+
+model Authority {
+  id          String        @id @default(uuid())
+  name        String
+  type        AuthorityType
+  description String?
+
+  authorityProfiles   AuthorityProfile[]
+  authorityNotifications AuthorityNotification[]
+  assignedComplaints  Complaint[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("authorities")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+
+  complaints   Complaint[]
+  routingRules RoutingRule[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
+model RoutingRule {
+  id            String        @id @default(uuid())
+  categoryId    String        @map("category_id")
+  authorityType AuthorityType @map("authority_type")
+  priority      Int           @default(0)
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@map("routing_rules")
+}
+
+model Complaint {
+  id                 String          @id @default(uuid())
+  referenceNumber    String          @unique @map("reference_number")
+  touristId          String          @map("tourist_id")
+  title              String
+  description        String
+  categoryId         String?         @map("category_id")
+  status             ComplaintStatus @default(SUBMITTED)
+  priority           NotificationPriority?
+  locationLat        Float?          @map("location_lat")
+  locationLng        Float?          @map("location_lng")
+  locationName       String?         @map("location_name")
+  incidentDate       DateTime        @map("incident_date")
+  isAnonymous        Boolean         @default(false) @map("is_anonymous")
+  assignedAuthorityId String?        @map("assigned_authority_id")
+  assignedOfficerId  String?         @map("assigned_officer_id")
+
+  tourist           TouristProfile    @relation(fields: [touristId], references: [id])
+  category          Category?         @relation(fields: [categoryId], references: [id])
+  assignedAuthority Authority?        @relation(fields: [assignedAuthorityId], references: [id])
+  evidence          Evidence[]
+  statusEvents      StatusEvent[]
+  touristNotifications TouristNotification[]
+  authorityNotifications AuthorityNotification[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([touristId])
+  @@index([createdAt])
+  @@index([assignedAuthorityId])
+  @@map("complaints")
+}
+
+model Evidence {
+  id           String        @id @default(uuid())
+  complaintId  String        @map("complaint_id")
+  type         EvidenceType
+  fileUrl      String        @map("file_url")
+  mimeType     String        @map("mime_type")
+  fileSize     Int           @map("file_size")
+  isVisible    Boolean       @default(false) @map("is_visible")
+  uploadedById String        @map("uploaded_by_id")
+
+  complaint  Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  uploadedBy User      @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([complaintId])
+  @@map("evidence")
+}
+
+model StatusEvent {
+  id           String           @id @default(uuid())
+  complaintId  String           @map("complaint_id")
+  fromStatus   ComplaintStatus? @map("from_status")
+  toStatus     ComplaintStatus  @map("to_status")
+  changedById  String           @map("changed_by_id")
+  remark       String?
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  changedBy User      @relation(fields: [changedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([complaintId])
+  @@index([createdAt])
+  @@map("status_events")
+}
+
+model TouristNotification {
+  id          String                  @id @default(uuid())
+  touristId   String                  @map("tourist_id")
+  complaintId String?                 @map("complaint_id")
+  type        TouristNotificationType
+  title       String
+  body        String
+  priority    NotificationPriority    @default(NORMAL)
+  isRead      Boolean                 @default(false) @map("is_read")
+  readAt      DateTime?               @map("read_at")
+
+  tourist  TouristProfile @relation(fields: [touristId], references: [id], onDelete: Cascade)
+  complaint Complaint?     @relation(fields: [complaintId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([touristId, isRead, createdAt])
+  @@index([complaintId, createdAt])
+  @@map("tourist_notifications")
+}
+
+model AuthorityNotification {
+  id              String                    @id @default(uuid())
+  authorityUserId String                    @map("authority_user_id")
+  authorityId     String                    @map("authority_id")
+  complaintId     String?                   @map("complaint_id")
+  type            AuthorityNotificationType
+  title           String
+  body            String
+  priority        NotificationPriority      @default(NORMAL)
+  isRead          Boolean                   @default(false) @map("is_read")
+  readAt          DateTime?                 @map("read_at")
+
+  authorityProfile AuthorityProfile @relation(fields: [authorityUserId], references: [id], onDelete: Cascade)
+  authority       Authority         @relation(fields: [authorityId], references: [id])
+  complaint       Complaint?        @relation(fields: [complaintId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([authorityUserId, isRead, createdAt])
+  @@index([authorityId, createdAt])
+  @@map("authority_notifications")
+}
+
+model NotificationDelivery {
+  id               String                     @id @default(uuid())
+  notificationKind String                     @map("notification_kind")
+  notificationId   String                     @map("notification_id")
+  recipientUserId  String                     @map("recipient_user_id")
+  channel          NotificationChannel
+  status           NotificationDeliveryStatus @default(PENDING)
+  attemptCount     Int                        @default(0) @map("attempt_count")
+  lastError        String?                    @map("last_error")
+  sentAt           DateTime?                  @map("sent_at")
+
+  recipient User @relation(fields: [recipientUserId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([recipientUserId, channel, status, createdAt])
+  @@map("notification_deliveries")
+}
+
+model NotificationPreference {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  channel   NotificationChannel
+  eventType String   @map("event_type")
+  enabled   Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, channel, eventType])
+  @@map("notification_preferences")
+}

@@ -125,6 +125,20 @@ Each rule file contains:
 - Correct code example with explanation
 - Additional context and references
 
-## Full Compiled Document
-
-For the complete guide with all rules expanded: `AGENTS.md`
+## Global Rules (apply to every phase, never violated)
+- **API contract is frozen once published.** Any breaking change requires versioning (`/api/v2`), never silent mutation of `/api/v1`.
+- **Every list endpoint is paginated.** Standard query params: `?page=1&limit=20`, response always includes `meta: { page, limit, total, totalPages }`. No endpoint returns an unbounded array.
+- **Complaint list endpoints support feed-style filtering.** Tourist and authority complaint feeds accept consistent query params where applicable: `status`, `category`, `priority`, `dateFrom`, `dateTo`, `q`, `sort`, `page`, `limit`.
+- **Response envelope is consistent:** `{ data, error, meta }` everywhere. No raw arrays/objects returned directly.
+- **CORS is explicit allow-list**, never `origin: '*'`. Only the deployed frontend domain(s) + local dev origin are whitelisted. Credentials mode (`credentials: true`) only paired with explicit origins, never wildcard — wildcard + credentials is a known misconfiguration that leaks session data cross-origin.
+- **No file exceeds ~150–200 lines.** Each NestJS module: controller → service → repository, split further into smaller providers if a service grows past this.
+- **SOLID applied concretely:** controllers depend on service interfaces, not implementations (DIP); one responsibility per service (SRP); category-routing logic and notification logic are separate services, not bolted into `ComplaintService` (OCP — new authority types/categories added via config/strategy, not by editing core logic).
+- **Design patterns to use deliberately** (call these out in code comments so it's demoable):
+  - **Strategy pattern** for routing logic (per-category routing strategy)
+  - **Repository pattern** for all DB access (no raw Prisma/TypeORM calls inside controllers)
+  - **Observer/Event pattern** for status-change → webhook/notification fan-out
+  - **Factory pattern** for generating reference numbers / login IDs
+- **Feature flags are config-driven**, not commented-out code. A central `FeatureFlagService` (env-var or DB-backed) gates: AI categorization, sentiment analysis, translation, heatmap. Code path always exists; flag controls execution.
+- **Notifications are event-driven and low-noise.** Important domain events create in-app notifications immediately; email is reserved for high-value events only (verification result, complaint submitted, authority assignment, evidence request, major status change, resolution, admin escalation). No email for every minor internal action.
+- **Sensitive data classification is decided in Phase 0 and never bypassed**: passport/ID numbers, phone numbers, email, exact GPS coordinates are "restricted" fields — never returned in list endpoints, only in detail endpoints to authorized roles, and excluded from logs entirely.
+- **Logging/monitoring/error tracking are set up in Phase 0**, not bolted on later — every phase from Phase 1 onward uses the same logger/error-tracker instance already wired.
