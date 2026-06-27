@@ -3,7 +3,7 @@ import { CheckCircle, Circle, Clock } from "@phosphor-icons/react/dist/ssr"
 import { COMPLAINT_STATUS_LABELS, ComplaintStatus, type ComplaintStatus as ComplaintStatusType } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 
-const TIMELINE_STEPS = [
+const TIMELINE_STEPS: readonly ComplaintStatusType[] = [
   ComplaintStatus.SUBMITTED,
   ComplaintStatus.UNDER_REVIEW,
   ComplaintStatus.ASSIGNED,
