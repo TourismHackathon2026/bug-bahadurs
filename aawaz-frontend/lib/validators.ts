@@ -2,7 +2,7 @@
 // TODO: Replace with Zod schemas when package is installed
 
 export interface LoginInput {
-  loginId: string
+  email: string
   password: string
 }
 
@@ -43,15 +43,15 @@ export function validateLoginInput(input: unknown): {
     return { success: false, error: "Invalid input shape" }
   }
   
-  const { loginId, password } = input
-  if (!loginId || typeof loginId !== "string" || loginId.trim() === "") {
-    return { success: false, error: "Login ID is required" }
+const { email, password } = input
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    return { success: false, error: "Email address is required" }
   }
   if (!password || typeof password !== "string" || password.trim() === "") {
     return { success: false, error: "Password is required" }
   }
-  
-  return { success: true, data: { loginId, password } }
+
+  return { success: true, data: { email, password } }
 }
 
 /**

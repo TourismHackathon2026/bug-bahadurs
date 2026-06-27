@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -8,8 +8,20 @@ import { Button } from "@/components/ui/button"
 import { MapPinPicker } from "@/components/map/map-pin-picker"
 import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { createComplaint } from "@/actions/complaint.actions"
-import { Plus } from "@phosphor-icons/react"
+import { uploadFiles } from "@/lib/uploadthing"
+import { Plus, X, Image, FileText, Video, UploadSimple } from "@phosphor-icons/react"
 import { toast } from "sonner"
+
+type SelectedEvidenceFile = {
+  file: File
+}
+
+type UploadedFile = {
+  fileUrl: string
+  name: string
+  type: string
+  size: number
+}
 
 export function NewComplaintForm() {
   const router = useRouter()
@@ -18,14 +30,42 @@ export function NewComplaintForm() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("TAXI_FRAUD")
-  const [incidentDate, setIncidentDate] = useState("")
+  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().split("T")[0])
+  const today = new Date().toISOString().split("T")[0]
   
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
   const [label, setLabel] = useState("")
   
+  const [selectedFiles, setSelectedFiles] = useState<SelectedEvidenceFile[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const handleFileSelection = (files: FileList | null) => {
+    if (!files) return
+
+    const candidates = Array.from(files)
+    const allowed = [...selectedFiles.map((item) => item.file), ...candidates]
+
+    if (allowed.length > 5) {
+      toast.error("You can attach up to 5 evidence files.")
+      return
+    }
+
+    const invalidFile = candidates.find((file) => file.size > 128 * 1024 * 1024)
+    if (invalidFile) {
+      toast.error("Each file must be 128MB or smaller.")
+      return
+    }
+
+    setSelectedFiles((current) => [...current, ...candidates.map((file) => ({ file }))])
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -42,6 +82,44 @@ export function NewComplaintForm() {
     if (lng !== null) formData.append("locationLng", lng.toString())
     if (label) formData.append("locationLabel", label)
 
+    let evidenceFiles: UploadedFile[] = []
+
+    if (selectedFiles.length > 0) {
+      setIsUploading(true)
+      try {
+        const response = await uploadFiles("evidenceUploader", {
+          files: selectedFiles.map((item) => item.file),
+        })
+
+        if (!response || response.length === 0) {
+          throw new Error("Evidence upload failed.")
+        }
+
+        evidenceFiles = response.map((item, index) => ({
+          fileUrl: item.url,
+          name: selectedFiles[index]?.file.name ?? `file-${index}`,
+          type: selectedFiles[index]?.file.type ?? "application/octet-stream",
+          size: selectedFiles[index]?.file.size ?? 0,
+        }))
+      } catch (err: any) {
+        console.error(err)
+        setError(err?.message || "Failed to upload evidence files.")
+        toast.error(err?.message || "Failed to upload evidence files.")
+        setIsPending(false)
+        setIsUploading(false)
+        return
+      } finally {
+        setIsUploading(false)
+      }
+    }
+
+    evidenceFiles.forEach((f, i) => {
+      formData.append(`evidence[${i}][url]`, f.fileUrl)
+      formData.append(`evidence[${i}][name]`, f.name)
+      formData.append(`evidence[${i}][type]`, f.type)
+      formData.append(`evidence[${i}][size]`, f.size.toString())
+    })
+
     try {
       const res = await createComplaint(formData)
       if (res && !res.success) {
@@ -50,6 +128,7 @@ export function NewComplaintForm() {
         setIsPending(false)
       } else {
         toast.success("Complaint submitted successfully!")
+        router.push(`/dashboard/complaints/${res.id}`)
       }
     } catch (err: any) {
       console.error(err)
@@ -57,6 +136,12 @@ export function NewComplaintForm() {
       toast.error("An unexpected error occurred.")
       setIsPending(false)
     }
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return <Image size={18} weight="fill" />
+    if (type.startsWith("video/")) return <Video size={18} weight="fill" />
+    return <FileText size={18} weight="fill" />
   }
 
   return (
@@ -86,6 +171,7 @@ export function NewComplaintForm() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={isPending}
+            className="bg-white"
           />
         </div>
 
@@ -108,6 +194,7 @@ export function NewComplaintForm() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={isPending}
+            className="bg-white"
           />
         </div>
 
@@ -119,7 +206,7 @@ export function NewComplaintForm() {
             <select
               id="category"
               name="category"
-              className="w-full rounded-md border border-input bg-surface px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+              className="h-11 w-full rounded-md border border-input bg-white px-3 text-sm leading-6 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
               required
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -144,10 +231,11 @@ export function NewComplaintForm() {
               name="incidentDate"
               type="date"
               required
-              max={new Date().toISOString().split("T")[0]}
+              max={today}
               value={incidentDate}
               onChange={(e) => setIncidentDate(e.target.value)}
               disabled={isPending}
+              className="bg-white h-11"
             />
           </div>
         </div>
@@ -184,9 +272,66 @@ export function NewComplaintForm() {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               disabled={isPending}
+              className="bg-white"
             />
           </div>
         )}
+
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Evidence (Images, Videos, PDFs)
+          </label>
+
+          <div className="grid gap-3 rounded-lg border border-dashed border-border bg-surface p-4">
+            <p className="text-sm text-foreground">Select files now, upload when the form is submitted.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="evidenceFiles"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/70"
+              >
+                <UploadSimple size={16} />
+                Choose files
+              </label>
+              <span className="text-xs text-muted-foreground">Max 5 files · 128MB each</span>
+            </div>
+            <input
+              id="evidenceFiles"
+              type="file"
+              accept="image/*,video/*,application/pdf"
+              multiple
+              disabled={isPending}
+              className="hidden"
+              onChange={(event) => handleFileSelection(event.target.files)}
+            />
+          </div>
+
+          {selectedFiles.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Selected files:</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedFiles.map((item, index) => (
+                  <div key={index} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
+                    <span className="text-primary">{getFileIcon(item.file.type)}</span>
+                    <span className="text-sm truncate max-w-[200px]">{item.file.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {(item.file.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 p-0"
+                      onClick={() => removeFile(index)}
+                      disabled={isPending}
+                    >
+                      <X size={12} weight="bold" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 border-t pt-6">
@@ -198,9 +343,9 @@ export function NewComplaintForm() {
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || isUploading}>
           <Plus className="mr-2" size={16} weight="bold" />
-          {isPending ? "Submitting..." : "Submit Complaint"}
+          {isPending ? "Submitting..." : isUploading ? "Uploading..." : "Submit Complaint"}
         </Button>
       </div>
     </form>

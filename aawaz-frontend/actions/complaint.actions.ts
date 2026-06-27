@@ -1,11 +1,13 @@
 "use server"
 
 import { z } from "zod"
-import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { ComplaintStatus, ComplaintCategory } from "@/lib/constants"
 import { getSession } from "@/lib/session"
-import { createComplaint as repoCreateComplaint } from "@/server/complaints"
+import {
+  createComplaint as repoCreateComplaint,
+  updateComplaintStatus as repoUpdateComplaintStatus,
+} from "@/server/complaints"
 import { categorizeComplaint } from "@/server/ai"
 
 const complaintSchema = z.object({
@@ -29,8 +31,6 @@ function readField(formData: FormData, key: string): string {
  * Server action to create a new complaint
  */
 export async function createComplaint(formData: FormData): Promise<{ success: boolean; error?: string; id?: string }> {
-  let createdId: string | undefined
-
   try {
     const session = await getSession()
     if (!session || session.role !== "TOURIST") {
@@ -59,6 +59,19 @@ export async function createComplaint(formData: FormData): Promise<{ success: bo
       return { success: false, error: "Incident date cannot be in the future." }
     }
 
+    const evidence = Array.from(formData.entries()).reduce<Array<{ storageKey: string; mimeType: string; sizeBytes: number }>>(
+      (files, [key, value]) => {
+        if (typeof value !== "string" || !key.match(/^evidence\[\d+\]\[url\]$/)) return files
+        const index = key.match(/\[(\d+)\]/)?.[1]
+        if (!index) return files
+        const mimeType = readField(formData, `evidence[${index}][type]`) || "application/octet-stream"
+        const sizeBytes = Number(readField(formData, `evidence[${index}][size]`) || 0)
+        files.push({ storageKey: value, mimeType, sizeBytes })
+        return files
+      },
+      []
+    )
+
     const complaint = await repoCreateComplaint({
       title: parsed.data.title,
       description: parsed.data.description,
@@ -68,29 +81,21 @@ export async function createComplaint(formData: FormData): Promise<{ success: bo
       locationLng: parsed.data.locationLng ?? undefined,
       locationLabel: parsed.data.locationLabel ?? undefined,
       touristId: session.userId,
+      evidence,
     })
 
-    createdId = complaint.id
-
-    // Enqueue background AI job if feature-flagged
-    if (process.env.FF_AI_CATEGORIZATION === "true") {
-      categorizeComplaint(complaint.id, complaint.description).catch((err) => {
-        console.error("[Action:complaint] Background AI categorization failed", err)
-      })
-    }
+    void categorizeComplaint(complaint.id, complaint.description).catch((err) => {
+      console.error("[Action:complaint] Background AI categorization failed", err)
+    })
 
     revalidatePath("/dashboard")
     revalidatePath("/dashboard/complaints")
+    revalidatePath("/authority/complaints")
+    return { success: true, id: complaint.id }
   } catch (error) {
     console.error("[Action:complaint] createComplaint failed", error)
     return { success: false, error: "Failed to submit the complaint. Please try again." }
   }
-
-  if (createdId) {
-    redirect(`/dashboard/complaints/${createdId}`)
-  }
-
-  return { success: false, error: "Could not redirect after creating complaint." }
 }
 
 /**
@@ -101,8 +106,23 @@ export async function updateComplaintStatus(
   status: ComplaintStatus,
   note?: string
 ): Promise<{ success: boolean; error?: string }> {
-  console.log(`[Action:complaint] updateComplaintStatus for ${id} to ${status} - not implemented`)
-  return { success: false, error: "Not yet implemented" }
+  try {
+    const session = await getSession()
+    if (!session || (session.role !== "AUTHORITY" && session.role !== "ADMIN")) {
+      return { success: false, error: "Unauthorized." }
+    }
+
+    await repoUpdateComplaintStatus(id, status, session.userId, note)
+    revalidatePath("/authority/dashboard")
+    revalidatePath("/authority/complaints")
+    revalidatePath(`/authority/complaints/${id}`)
+    revalidatePath(`/dashboard/complaints/${id}`)
+    revalidatePath("/dashboard")
+    return { success: true }
+  } catch (error) {
+    console.error("[Action:complaint] updateComplaintStatus failed", error)
+    return { success: false, error: "Failed to update complaint status." }
+  }
 }
 
 /**
@@ -112,6 +132,5 @@ export async function resolveComplaint(
   id: string,
   summary: string
 ): Promise<{ success: boolean; error?: string }> {
-  console.log(`[Action:complaint] resolveComplaint for ${id} - not implemented`)
-  return { success: false, error: "Not yet implemented" }
+  return updateComplaintStatus(id, ComplaintStatus.RESOLVED, summary || "Complaint resolved")
 }

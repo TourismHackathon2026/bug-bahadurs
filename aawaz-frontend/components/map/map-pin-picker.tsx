@@ -11,6 +11,7 @@ interface Location {
 interface MapPinPickerProps {
   onLocationSelect?: (location: Location) => void
   defaultCenter?: { lat: number; lng: number }
+  selectedLocation?: Location
   disabled?: boolean
 }
 
@@ -21,6 +22,7 @@ interface MapPinPickerProps {
 export function MapPinPicker({
   onLocationSelect,
   defaultCenter = { lat: 27.7172, lng: 85.324 }, // Kathmandu
+  selectedLocation,
   disabled = false,
 }: MapPinPickerProps) {
   return (
@@ -28,10 +30,20 @@ export function MapPinPicker({
       <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
         <MapPin size={24} weight="fill" />
       </div>
-      <p className="mt-3 text-sm font-medium">Interactive Map Picker</p>
+      <p className="mt-3 text-sm font-medium">
+        {disabled ? "Reported location preview" : "Interactive Map Picker"}
+      </p>
       <p className="mt-1 text-xs text-muted-foreground max-w-xs">
         Map visualization is currently represented as a placeholder. In production, this loads OpenStreetMap.
       </p>
+
+      {disabled && selectedLocation ? (
+        <div className="mt-4 rounded-lg border border-border/70 bg-background/80 px-4 py-3 text-left text-sm text-foreground">
+          <p className="font-medium">{selectedLocation.label}</p>
+          <p className="text-muted-foreground">Lat: {selectedLocation.lat.toFixed(4)}</p>
+          <p className="text-muted-foreground">Lng: {selectedLocation.lng.toFixed(4)}</p>
+        </div>
+      ) : null}
       
       {!disabled && onLocationSelect && (
         <button

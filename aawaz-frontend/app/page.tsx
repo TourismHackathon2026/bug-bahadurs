@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 
 const sampleComplaint = {
+  id: "sample",
   reference: "AWA-2026-0142",
   title: "Taxi overcharged after airport pickup",
   description:

@@ -4,6 +4,7 @@ import {
   FileText,
   Images,
 } from "@phosphor-icons/react/dist/ssr"
+import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import type { ComplaintStatus, Priority } from "@/lib/constants"
 
 export type ComplaintCardProps = {
+  id: string
   reference: string
   title: string
   description: string
@@ -22,9 +24,11 @@ export type ComplaintCardProps = {
   lastUpdated: string
   evidenceCount: number
   responsePreview?: string
+  href?: string
 }
 
 export function ComplaintCard({
+  id,
   reference,
   title,
   description,
@@ -34,6 +38,7 @@ export function ComplaintCard({
   lastUpdated,
   evidenceCount,
   responsePreview,
+  href,
 }: ComplaintCardProps) {
   return (
     <Card className="overflow-hidden border-border/70 bg-surface shadow-[0_18px_60px_oklch(0.29_0.012_96_/_0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_70px_oklch(0.29_0.012_96_/_0.12)]">
@@ -75,9 +80,11 @@ export function ComplaintCard({
       </CardContent>
       <CardFooter className="justify-between border-t bg-surface-strong/50">
         <span className="text-xs text-muted-foreground">Status updates sync live</span>
-        <Button variant="ghost" size="sm">
-          Open
-          <ArrowRight />
+        <Button asChild variant="ghost" size="sm">
+          <Link href={href ?? `/dashboard/complaints/${id}`}>
+            Open
+            <ArrowRight />
+          </Link>
         </Button>
       </CardFooter>
     </Card>

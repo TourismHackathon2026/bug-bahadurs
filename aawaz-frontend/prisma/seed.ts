@@ -27,12 +27,58 @@ async function main() {
     },
   })
 
+  const authorityPassword = "12345678"
+  const authorityHash = await hashPassword(authorityPassword)
+  const authorityAccounts = [
+    { email: "nepalpolice@gmail.com", displayName: "Nepal Police", authorityType: "NEPAL_POLICE" },
+    { email: "trafficpolice@gmail.com", displayName: "Traffic Police", authorityType: "TRAFFIC_POLICE" },
+    { email: "tourismboard@gmail.com", displayName: "Tourism Board", authorityType: "TOURISM_BOARD" },
+    { email: "hotelassociation@gmail.com", displayName: "Hotel Association", authorityType: "HOTEL_ASSOCIATION" },
+  ]
+
+  const authorityUsers = []
+  for (const account of authorityAccounts) {
+    const user = await prisma.user.upsert({
+      where: { email: account.email },
+      update: {
+        role: "AUTHORITY",
+        passwordHash: authorityHash,
+        displayName: account.displayName,
+      },
+      create: {
+        role: "AUTHORITY",
+        email: account.email,
+        displayName: account.displayName,
+        passwordHash: authorityHash,
+      },
+    })
+
+    await prisma.authorityProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        authorityType: account.authorityType,
+      },
+      create: {
+        userId: user.id,
+        authorityType: account.authorityType,
+      },
+    })
+
+    authorityUsers.push({ ...user, authorityType: account.authorityType })
+  }
+
   console.log("\n==================================================")
   console.log("Seeding Completed Successfully!")
   console.log(`Admin User:`)
   console.log(`- Login ID: ${admin.loginId}`)
   console.log(`- Email:    ${admin.email}`)
   console.log(`- Password: ${adminPassword}`)
+  console.log("\nAuthority Users:")
+  authorityUsers.forEach((user) => {
+    console.log(`- ${user.displayName}`)
+    console.log(`  Email: ${user.email}`)
+    console.log(`  Password: ${authorityPassword}`)
+  })
   console.log("==================================================\n")
 }
 

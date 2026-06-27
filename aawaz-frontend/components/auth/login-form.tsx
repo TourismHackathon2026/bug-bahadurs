@@ -31,7 +31,7 @@ export function LoginForm() {
         </div>
         <h2 className="mt-4 text-2xl font-bold tracking-tight">Sign in to Awaaz</h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Enter your 8-digit Login ID and password
+          Enter your email address and password
         </p>
       </div>
 
@@ -44,19 +44,17 @@ export function LoginForm() {
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="loginId" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Login ID
+            <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Email address
             </label>
             <Input
-              id="loginId"
-              name="loginId"
-              type="text"
-              inputMode="numeric"
-              placeholder="12345678"
+              id="email"
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              autoComplete="email"
               required
               disabled={pending}
-              pattern="[0-9]{8}"
-              maxLength={8}
             />
           </div>
 
