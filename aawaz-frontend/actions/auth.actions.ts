@@ -20,7 +20,7 @@ const registerSchema = z.object({
 })
 
 const loginSchema = z.object({
-  loginId: z.string().trim().regex(/^\d{8}$/),
+  email: z.string().trim().email(),
   password: z.string().min(1),
 })
 
@@ -118,16 +118,16 @@ export async function login(formData: FormData): Promise<ActionResult> {
 
   try {
     const parsed = loginSchema.safeParse({
-      loginId: readField(formData, "loginId"),
+      email: readField(formData, "email"),
       password: readField(formData, "password"),
     })
 
     if (!parsed.success) {
-      return { success: false, error: "Enter a valid 8-digit Login ID and password." }
+      return { success: false, error: "Enter a valid email address and password." }
     }
 
     user = await prisma.user.findUnique({
-      where: { loginId: parsed.data.loginId },
+      where: { email: parsed.data.email },
       select: {
         id: true,
         role: true,
@@ -137,13 +137,13 @@ export async function login(formData: FormData): Promise<ActionResult> {
     })
 
     if (!user) {
-      return { success: false, error: "We couldn't find an approved account for that Login ID." }
+      return { success: false, error: "We couldn't find an account for that email address." }
     }
 
     const passwordMatches = await verifyPassword(parsed.data.password, user.passwordHash)
 
     if (!passwordMatches) {
-      return { success: false, error: "The password does not match that Login ID." }
+      return { success: false, error: "The password does not match that email address." }
     }
 
     await setSession({

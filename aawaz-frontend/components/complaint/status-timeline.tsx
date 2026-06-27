@@ -17,7 +17,10 @@ type StatusTimelineProps = {
 }
 
 export function StatusTimeline({ currentStatus, reachedAt = {} }: StatusTimelineProps) {
-  const currentIndex = TIMELINE_STEPS.indexOf(currentStatus)
+  const currentIndex =
+    currentStatus === ComplaintStatus.CLOSED
+      ? TIMELINE_STEPS.length - 1
+      : TIMELINE_STEPS.indexOf(currentStatus)
 
   return (
     <div className="rounded-lg border bg-surface p-4">

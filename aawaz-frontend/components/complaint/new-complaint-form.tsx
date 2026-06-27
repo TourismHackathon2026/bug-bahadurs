@@ -8,8 +8,16 @@ import { Button } from "@/components/ui/button"
 import { MapPinPicker } from "@/components/map/map-pin-picker"
 import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { createComplaint } from "@/actions/complaint.actions"
-import { Plus } from "@phosphor-icons/react"
+import { UploadDropzone } from "@/lib/uploadthing"
+import { Plus, X, Image, FileText, Video } from "@phosphor-icons/react"
 import { toast } from "sonner"
+
+type UploadedFile = {
+  fileUrl: string
+  name: string
+  type: string
+  size: number
+}
 
 export function NewComplaintForm() {
   const router = useRouter()
@@ -18,14 +26,55 @@ export function NewComplaintForm() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("TAXI_FRAUD")
-  const [incidentDate, setIncidentDate] = useState("")
+  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().split("T")[0])
+  const today = new Date().toISOString().split("T")[0]
   
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
   const [label, setLabel] = useState("")
   
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const handleFileUpload = async (files: File[]) => {
+    setIsUploading(true)
+    try {
+      const res = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: files.map(f => ({ name: f.name, type: f.type, size: f.size })) }),
+      })
+      const data = await res.json()
+      
+      if (!res.ok) throw new Error(data.error || "Failed to get upload URL")
+      
+      const uploadPromises = files.map(async (file, index) => {
+        const uploadRes = await fetch(data.uploadUrls[index], {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        })
+        if (!uploadRes.ok) throw new Error("Upload failed")
+        return { fileUrl: data.fileUrls[index], name: file.name, type: file.type, size: file.size }
+      })
+      
+      const newFiles = await Promise.all(uploadPromises)
+      setUploadedFiles(prev => [...prev, ...newFiles])
+      toast.success(`${newFiles.length} file(s) uploaded`)
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || "Upload failed")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -41,6 +90,14 @@ export function NewComplaintForm() {
     if (lat !== null) formData.append("locationLat", lat.toString())
     if (lng !== null) formData.append("locationLng", lng.toString())
     if (label) formData.append("locationLabel", label)
+    
+    // Add evidence URLs
+    uploadedFiles.forEach((f, i) => {
+      formData.append(`evidence[${i}][url]`, f.fileUrl)
+      formData.append(`evidence[${i}][name]`, f.name)
+      formData.append(`evidence[${i}][type]`, f.type)
+      formData.append(`evidence[${i}][size]`, f.size.toString())
+    })
 
     try {
       const res = await createComplaint(formData)
@@ -50,6 +107,7 @@ export function NewComplaintForm() {
         setIsPending(false)
       } else {
         toast.success("Complaint submitted successfully!")
+        router.push(`/dashboard/complaints/${res.id}`)
       }
     } catch (err: any) {
       console.error(err)
@@ -57,6 +115,12 @@ export function NewComplaintForm() {
       toast.error("An unexpected error occurred.")
       setIsPending(false)
     }
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return <Image size={18} weight="fill" />
+    if (type.startsWith("video/")) return <Video size={18} weight="fill" />
+    return <FileText size={18} weight="fill" />
   }
 
   return (
@@ -86,6 +150,7 @@ export function NewComplaintForm() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={isPending}
+            className="bg-white"
           />
         </div>
 
@@ -108,6 +173,7 @@ export function NewComplaintForm() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={isPending}
+            className="bg-white"
           />
         </div>
 
@@ -119,7 +185,7 @@ export function NewComplaintForm() {
             <select
               id="category"
               name="category"
-              className="w-full rounded-md border border-input bg-surface px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+              className="h-11 w-full rounded-md border border-input bg-white px-3 text-sm leading-6 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
               required
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -144,10 +210,11 @@ export function NewComplaintForm() {
               name="incidentDate"
               type="date"
               required
-              max={new Date().toISOString().split("T")[0]}
+              max={today}
               value={incidentDate}
               onChange={(e) => setIncidentDate(e.target.value)}
               disabled={isPending}
+              className="bg-white h-11"
             />
           </div>
         </div>
@@ -184,9 +251,71 @@ export function NewComplaintForm() {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               disabled={isPending}
+              className="bg-white"
             />
           </div>
         )}
+
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Evidence (Images, Videos, PDFs)
+          </label>
+          <UploadDropzone
+            endpoint="evidenceUploader"
+            onUploadComplete={(files: Array<{ serverData?: { fileUrl?: string }; url: string; name: string; type: string; size: number }>) => {
+              const newFiles = files.map((f) => ({
+                fileUrl: f.serverData?.fileUrl || f.url,
+                name: f.name,
+                type: f.type,
+                size: f.size,
+              }))
+              setUploadedFiles(prev => [...prev, ...newFiles])
+              toast.success(`${newFiles.length} file(s) uploaded`)
+            }}
+            onUploadProgress={(progress: number) => {
+              if (progress === 100) setIsUploading(false)
+              else setIsUploading(true)
+            }}
+            disabled={isPending}
+            className="border-2 border-dashed border-border rounded-lg p-6"
+          >
+            <div className="flex flex-col items-center gap-3 text-center text-muted-foreground">
+              <Plus className="size-10 text-border border-border rounded-full p-2" weight="duotone" />
+              <div>
+                <p className="font-medium">Drag & drop evidence files</p>
+                <p className="text-sm">or click to browse</p>
+              </div>
+              <p className="text-xs">Max 5 files · 128MB each</p>
+            </div>
+          </UploadDropzone>
+          
+          {uploadedFiles.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Uploaded files:</p>
+              <div className="flex flex-wrap gap-2">
+                {uploadedFiles.map((file, index) => (
+                  <div key={index} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
+                    <span className="text-primary">{getFileIcon(file.type)}</span>
+                    <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 p-0"
+                      onClick={() => removeFile(index)}
+                      disabled={isPending}
+                    >
+                      <X size={12} weight="bold" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 border-t pt-6">
@@ -198,9 +327,9 @@ export function NewComplaintForm() {
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || isUploading}>
           <Plus className="mr-2" size={16} weight="bold" />
-          {isPending ? "Submitting..." : "Submit Complaint"}
+          {isPending ? "Submitting..." : isUploading ? "Uploading..." : "Submit Complaint"}
         </Button>
       </div>
     </form>

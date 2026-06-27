@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { PlusCircle } from "@phosphor-icons/react/dist/ssr"
 
 import { Button } from "@/components/ui/button"
@@ -12,9 +13,11 @@ export function FeedComposerCTA() {
           File a complaint with evidence, location, and status tracking.
         </p>
       </div>
-      <Button>
-        <PlusCircle weight="bold" />
-        File complaint
+      <Button asChild>
+        <Link href="/complaints/new">
+          <PlusCircle weight="bold" />
+          File complaint
+        </Link>
       </Button>
     </Card>
   )
