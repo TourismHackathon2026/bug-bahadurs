@@ -57,7 +57,7 @@ export async function createSessionToken(session: Session): Promise<string> {
   return new SignJWT({ ...session })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(SESSION_TTL_SECONDS)
+    .setExpirationTime("7d")
     .sign(getSessionSecret())
 }
 
