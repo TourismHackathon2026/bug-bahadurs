@@ -31,20 +31,7 @@ function readField(formData: FormData, key: string): string {
   return typeof value === "string" ? value : ""
 }
 
-function encryptDocumentRef(documentRef: string): string {
-  const secret = process.env.SESSION_SECRET
-  if (!secret || secret.length < 32) {
-    throw new Error("SESSION_SECRET must be configured before handling registrations.")
-  }
 
-  const key = crypto.createHash("sha256").update(secret).digest()
-  const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv)
-  const ciphertext = Buffer.concat([cipher.update(documentRef, "utf8"), cipher.final()])
-  const tag = cipher.getAuthTag()
-
-  return `v1:${iv.toString("hex")}:${tag.toString("hex")}:${ciphertext.toString("hex")}`
-}
 
 export async function registerTourist(formData: FormData): Promise<ActionResult> {
   try {
@@ -71,7 +58,6 @@ export async function registerTourist(formData: FormData): Promise<ActionResult>
     }
 
     const passwordHash = await hashPassword(parsed.data.password)
-    const encryptedDocumentRef = encryptDocumentRef(parsed.data.documentRef)
 
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -90,7 +76,7 @@ export async function registerTourist(formData: FormData): Promise<ActionResult>
           userId: user.id,
           status: RegistrationStatus.PENDING,
           documentType: parsed.data.documentType,
-          documentRef: encryptedDocumentRef,
+          documentRef: parsed.data.documentRef,
           documentUrl: parsed.data.documentUrl,
         },
       })

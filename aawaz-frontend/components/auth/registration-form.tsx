@@ -8,6 +8,8 @@ import { registerTourist } from "@/actions/auth.actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
+import { uploadFiles } from "@/lib/uploadthing"
+
 type RegistrationDraft = {
   displayName: string
   email: string
@@ -94,36 +96,15 @@ export function RegistrationForm() {
       throw new Error("A document file is required.")
     }
 
-    const uploadResponse = await fetch("/api/upload-url", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        filename: documentFile.name,
-        contentType: documentFile.type || "application/octet-stream",
-      }),
+    const response = await uploadFiles("documentUploader", {
+      files: [documentFile],
     })
 
-    if (!uploadResponse.ok) {
-      throw new Error("We could not prepare the document upload.")
-    }
-
-    const uploadData: { uploadUrl: string; storageKey: string } = await uploadResponse.json()
-
-    const uploadResult = await fetch(uploadData.uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": documentFile.type || "application/octet-stream",
-      },
-      body: documentFile,
-    })
-
-    if (!uploadResult.ok) {
+    if (!response || response.length === 0) {
       throw new Error("Document upload failed.")
     }
 
-    return uploadData.storageKey
+    return response[0].url
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
