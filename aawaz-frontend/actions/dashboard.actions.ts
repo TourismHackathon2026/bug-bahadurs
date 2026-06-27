@@ -66,8 +66,14 @@ export async function getDashboardComplaints(
   }
 
   const { complaints, total } = await getComplaintsForTourist(session.userId, filters, page, limit)
+  const sorted = [...complaints].sort((a, b) => {
+    const aDone = a.status === "RESOLVED" || a.status === "CLOSED" ? 1 : 0
+    const bDone = b.status === "RESOLVED" || b.status === "CLOSED" ? 1 : 0
+    if (aDone !== bDone) return aDone - bDone
+    return b.createdAt.getTime() - a.createdAt.getTime()
+  })
   return {
-    complaints: complaints.map(mapComplaint),
+    complaints: sorted.map(mapComplaint),
     total,
   }
 }

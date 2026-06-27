@@ -10,7 +10,7 @@ import { AUTHORITY_TYPE_LABELS, COMPLAINT_CATEGORY_LABELS, type ComplaintStatus 
 import { confirmEvidence } from "@/actions/evidence.actions"
 import { ComplaintEvidenceUploader } from "@/components/complaint/complaint-evidence-uploader"
 import { CopyReferenceButton } from "@/components/complaint/copy-reference-button"
-import { MapPinPicker } from "@/components/map/map-pin-picker"
+import { MapPinPickerLazy as MapPinPicker } from "@/components/map/map-pin-picker-lazy"
 
 interface ComplaintDetailPageProps {
   params: Promise<{ id: string }>

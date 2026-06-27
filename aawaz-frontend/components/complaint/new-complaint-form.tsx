@@ -5,15 +5,10 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import dynamic from "next/dynamic";
+import { MapPinPickerLazy as MapPinPicker } from "@/components/map/map-pin-picker-lazy";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { createComplaint } from "@/actions/complaint.actions";
 import { uploadFiles } from "@/lib/uploadthing";
-
-const MapPinPicker = dynamic(
-  () => import("@/components/map/map-pin-picker").then((m) => m.MapPinPicker),
-  { ssr: false },
-);
 import {
   Plus,
   X,
