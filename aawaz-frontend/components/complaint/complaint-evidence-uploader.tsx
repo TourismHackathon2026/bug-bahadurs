@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { FileUpload, Plus } from "@phosphor-icons/react"
+import { UploadIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 type ConfirmEvidenceAction = (
@@ -84,7 +84,7 @@ export function ComplaintEvidenceUploader({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-2">
-          <Plus size={14} />
+          <UploadIcon size={14} />
           Add Evidence
         </Button>
       </DialogTrigger>
@@ -111,7 +111,7 @@ export function ComplaintEvidenceUploader({
             className="border-2 border-dashed border-border rounded-lg p-6"
           >
             <div className="flex flex-col items-center gap-3 text-center text-muted-foreground">
-              <FileUpload size={24} />
+              <UploadIcon size={24} />
               <div>
                 <p className="font-medium">Drag & drop evidence files</p>
                 <p className="text-sm">or click to browse</p>

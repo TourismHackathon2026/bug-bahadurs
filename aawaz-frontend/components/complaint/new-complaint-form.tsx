@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -8,9 +8,13 @@ import { Button } from "@/components/ui/button"
 import { MapPinPicker } from "@/components/map/map-pin-picker"
 import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { createComplaint } from "@/actions/complaint.actions"
-import { UploadDropzone } from "@/lib/uploadthing"
-import { Plus, X, Image, FileText, Video } from "@phosphor-icons/react"
+import { uploadFiles } from "@/lib/uploadthing"
+import { Plus, X, Image, FileText, Video, UploadSimple } from "@phosphor-icons/react"
 import { toast } from "sonner"
+
+type SelectedEvidenceFile = {
+  file: File
+}
 
 type UploadedFile = {
   fileUrl: string
@@ -33,47 +37,34 @@ export function NewComplaintForm() {
   const [lng, setLng] = useState<number | null>(null)
   const [label, setLabel] = useState("")
   
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<SelectedEvidenceFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleFileUpload = async (files: File[]) => {
-    setIsUploading(true)
-    try {
-      const res = await fetch("/api/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: files.map(f => ({ name: f.name, type: f.type, size: f.size })) }),
-      })
-      const data = await res.json()
-      
-      if (!res.ok) throw new Error(data.error || "Failed to get upload URL")
-      
-      const uploadPromises = files.map(async (file, index) => {
-        const uploadRes = await fetch(data.uploadUrls[index], {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type },
-        })
-        if (!uploadRes.ok) throw new Error("Upload failed")
-        return { fileUrl: data.fileUrls[index], name: file.name, type: file.type, size: file.size }
-      })
-      
-      const newFiles = await Promise.all(uploadPromises)
-      setUploadedFiles(prev => [...prev, ...newFiles])
-      toast.success(`${newFiles.length} file(s) uploaded`)
-    } catch (err: any) {
-      console.error(err)
-      toast.error(err.message || "Upload failed")
-    } finally {
-      setIsUploading(false)
+  const handleFileSelection = (files: FileList | null) => {
+    if (!files) return
+
+    const candidates = Array.from(files)
+    const allowed = [...selectedFiles.map((item) => item.file), ...candidates]
+
+    if (allowed.length > 5) {
+      toast.error("You can attach up to 5 evidence files.")
+      return
     }
+
+    const invalidFile = candidates.find((file) => file.size > 128 * 1024 * 1024)
+    if (invalidFile) {
+      toast.error("Each file must be 128MB or smaller.")
+      return
+    }
+
+    setSelectedFiles((current) => [...current, ...candidates.map((file) => ({ file }))])
   }
 
   const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -90,9 +81,39 @@ export function NewComplaintForm() {
     if (lat !== null) formData.append("locationLat", lat.toString())
     if (lng !== null) formData.append("locationLng", lng.toString())
     if (label) formData.append("locationLabel", label)
-    
-    // Add evidence URLs
-    uploadedFiles.forEach((f, i) => {
+
+    let evidenceFiles: UploadedFile[] = []
+
+    if (selectedFiles.length > 0) {
+      setIsUploading(true)
+      try {
+        const response = await uploadFiles("evidenceUploader", {
+          files: selectedFiles.map((item) => item.file),
+        })
+
+        if (!response || response.length === 0) {
+          throw new Error("Evidence upload failed.")
+        }
+
+        evidenceFiles = response.map((item, index) => ({
+          fileUrl: item.url,
+          name: selectedFiles[index]?.file.name ?? `file-${index}`,
+          type: selectedFiles[index]?.file.type ?? "application/octet-stream",
+          size: selectedFiles[index]?.file.size ?? 0,
+        }))
+      } catch (err: any) {
+        console.error(err)
+        setError(err?.message || "Failed to upload evidence files.")
+        toast.error(err?.message || "Failed to upload evidence files.")
+        setIsPending(false)
+        setIsUploading(false)
+        return
+      } finally {
+        setIsUploading(false)
+      }
+    }
+
+    evidenceFiles.forEach((f, i) => {
       formData.append(`evidence[${i}][url]`, f.fileUrl)
       formData.append(`evidence[${i}][name]`, f.name)
       formData.append(`evidence[${i}][type]`, f.type)
@@ -260,45 +281,40 @@ export function NewComplaintForm() {
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Evidence (Images, Videos, PDFs)
           </label>
-          <UploadDropzone
-            endpoint="evidenceUploader"
-            onUploadComplete={(files: Array<{ serverData?: { fileUrl?: string }; url: string; name: string; type: string; size: number }>) => {
-              const newFiles = files.map((f) => ({
-                fileUrl: f.serverData?.fileUrl || f.url,
-                name: f.name,
-                type: f.type,
-                size: f.size,
-              }))
-              setUploadedFiles(prev => [...prev, ...newFiles])
-              toast.success(`${newFiles.length} file(s) uploaded`)
-            }}
-            onUploadProgress={(progress: number) => {
-              if (progress === 100) setIsUploading(false)
-              else setIsUploading(true)
-            }}
-            disabled={isPending}
-            className="border-2 border-dashed border-border rounded-lg p-6"
-          >
-            <div className="flex flex-col items-center gap-3 text-center text-muted-foreground">
-              <Plus className="size-10 text-border border-border rounded-full p-2" weight="duotone" />
-              <div>
-                <p className="font-medium">Drag & drop evidence files</p>
-                <p className="text-sm">or click to browse</p>
-              </div>
-              <p className="text-xs">Max 5 files · 128MB each</p>
+
+          <div className="grid gap-3 rounded-lg border border-dashed border-border bg-surface p-4">
+            <p className="text-sm text-foreground">Select files now, upload when the form is submitted.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="evidenceFiles"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/70"
+              >
+                <UploadSimple size={16} />
+                Choose files
+              </label>
+              <span className="text-xs text-muted-foreground">Max 5 files · 128MB each</span>
             </div>
-          </UploadDropzone>
-          
-          {uploadedFiles.length > 0 && (
+            <input
+              id="evidenceFiles"
+              type="file"
+              accept="image/*,video/*,application/pdf"
+              multiple
+              disabled={isPending}
+              className="hidden"
+              onChange={(event) => handleFileSelection(event.target.files)}
+            />
+          </div>
+
+          {selectedFiles.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Uploaded files:</p>
+              <p className="text-xs font-medium text-muted-foreground">Selected files:</p>
               <div className="flex flex-wrap gap-2">
-                {uploadedFiles.map((file, index) => (
+                {selectedFiles.map((item, index) => (
                   <div key={index} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
-                    <span className="text-primary">{getFileIcon(file.type)}</span>
-                    <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                    <span className="text-primary">{getFileIcon(item.file.type)}</span>
+                    <span className="text-sm truncate max-w-[200px]">{item.file.name}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {(file.size / 1024 / 1024).toFixed(1)} MB
+                      {(item.file.size / 1024 / 1024).toFixed(1)} MB
                     </span>
                     <Button
                       type="button"
