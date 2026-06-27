@@ -1,0 +1,171 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  role         Role
+  passwordHash String
+  loginId      String?  @unique // numeric, authority/tourist only
+  email        String   @unique
+  displayName  String
+  createdAt    DateTime @default(now())
+
+  touristProfile   TouristProfile?
+  authorityProfile AuthorityProfile?
+  complaints       Complaint[]       @relation("TouristComplaints")
+  assignedTo       Complaint[]       @relation("AssignedComplaints")
+  notifications    Notification[]
+  statusEvents     StatusEvent[]
+}
+
+model TouristProfile {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id])
+  status          RegistrationStatus @default(PENDING)
+  documentType    String
+  documentRef     String // encrypted
+  documentUrl     String // object storage ref
+  rejectionReason String?
+}
+
+model AuthorityProfile {
+  id            String        @id @default(uuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id])
+  authorityType AuthorityType
+}
+
+model Complaint {
+  id            String             @id @default(uuid())
+  referenceNo   String             @unique // e.g. AWAAZ-2026-00231
+  title         String
+  description   String
+  category      ComplaintCategory
+  status        ComplaintStatus    @default(SUBMITTED)
+  priority      Priority           @default(NORMAL)
+  incidentDate  DateTime
+  locationLat   Float?
+  locationLng   Float?
+  locationLabel String?
+  touristId     String
+  tourist       User               @relation("TouristComplaints", fields: [touristId], references: [id])
+  assignedToId  String?
+  assignedTo    User?              @relation("AssignedComplaints", fields: [assignedToId], references: [id])
+  aiCategory    ComplaintCategory?
+  aiConfidence  Float?
+  descOriginal  String? // if translated
+  detectedLang  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  evidence      Evidence[]
+  statusEvents  StatusEvent[]
+  notifications Notification[]
+
+  @@index([touristId, status, createdAt])
+  @@index([assignedToId, status, createdAt])
+  @@index([status, category, createdAt])
+}
+
+model Evidence {
+  id          String    @id @default(uuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id])
+  storageKey  String
+  mimeType    String
+  sizeBytes   Int
+  uploadedAt  DateTime  @default(now())
+}
+
+model StatusEvent {
+  id          String          @id @default(uuid())
+  complaintId String
+  complaint   Complaint       @relation(fields: [complaintId], references: [id])
+  status      ComplaintStatus
+  note        String?
+  actorId     String
+  actor       User            @relation(fields: [actorId], references: [id])
+  createdAt   DateTime        @default(now())
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  complaintId String?
+  complaint   Complaint?       @relation(fields: [complaintId], references: [id])
+  type        NotificationType
+  title       String
+  body        String
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, isRead, createdAt])
+}
+
+enum Role {
+  TOURIST
+  AUTHORITY
+  ADMIN
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AuthorityType {
+  NEPAL_POLICE
+  TOURISM_BOARD
+  HOTEL_ASSOCIATION
+  TRAFFIC_POLICE
+  MUNICIPALITY
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  INVESTIGATION
+  RESOLVED
+  CLOSED
+}
+
+enum ComplaintCategory {
+  TAXI_FRAUD
+  HOTEL_ISSUE
+  TREKKING_SAFETY
+  OVERCHARGING
+  HARASSMENT
+  THEFT
+  OTHER
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  REGISTRATION_SUBMITTED
+  COMPLAINT_SUBMITTED
+  STATUS_CHANGED
+  EVIDENCE_REQUESTED
+  EVIDENCE_UPLOADED
+  RESOLVED
+  REGISTRATION_APPROVED
+  REGISTRATION_REJECTED
+  NEW_ASSIGNMENT
+  ESCALATED
+}

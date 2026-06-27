@@ -57,6 +57,7 @@ export const ComplaintCategory = {
 export type ComplaintCategory = (typeof ComplaintCategory)[keyof typeof ComplaintCategory]
 
 export const NotificationType = {
+  REGISTRATION_SUBMITTED: "REGISTRATION_SUBMITTED",
   COMPLAINT_SUBMITTED: "COMPLAINT_SUBMITTED",
   STATUS_CHANGED: "STATUS_CHANGED",
   EVIDENCE_REQUESTED: "EVIDENCE_REQUESTED",
@@ -115,4 +116,3 @@ export const COMPLAINT_CATEGORY_LABELS: Record<ComplaintCategory, string> = {
   THEFT: "Theft",
   OTHER: "Other",
 }
-

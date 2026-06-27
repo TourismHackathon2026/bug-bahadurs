@@ -3,7 +3,7 @@
 
 export interface SSEEvent {
   type: string
-  payload: any
+  payload: unknown
   timestamp: string
 }
 
@@ -38,7 +38,7 @@ class SSEEmitter {
   /**
    * Emit an event to all active SSE streams connected for a user
    */
-  emit(userId: string, type: string, payload: any): void {
+  emit(userId: string, type: string, payload: unknown): void {
     const userListeners = this.listeners.get(userId)
     if (!userListeners || userListeners.size === 0) {
       console.log(`[SSE:Emitter] No active listeners for user ${userId}. Dropping event ${type}.`)
