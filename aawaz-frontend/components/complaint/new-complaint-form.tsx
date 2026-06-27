@@ -1,98 +1,129 @@
-"use client"
+"use client";
 
-import { useState, type FormEvent } from "react"
-import { useRouter } from "next/navigation"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
-import { MapPinPicker } from "@/components/map/map-pin-picker"
-import { useFeatureFlag } from "@/hooks/useFeatureFlag"
-import { createComplaint } from "@/actions/complaint.actions"
-import { uploadFiles } from "@/lib/uploadthing"
-import { Plus, X, Image, FileText, Video, UploadSimple } from "@phosphor-icons/react"
-import { toast } from "sonner"
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { createComplaint } from "@/actions/complaint.actions";
+import { uploadFiles } from "@/lib/uploadthing";
+
+const MapPinPicker = dynamic(
+  () => import("@/components/map/map-pin-picker").then((m) => m.MapPinPicker),
+  { ssr: false },
+);
+import {
+  Plus,
+  X,
+  Image,
+  FileText,
+  Video,
+  UploadSimple,
+} from "@phosphor-icons/react";
+import { toast } from "sonner";
 
 type SelectedEvidenceFile = {
-  file: File
-}
+  file: File;
+};
 
 type UploadedFile = {
-  fileUrl: string
-  name: string
-  type: string
-  size: number
-}
+  fileUrl: string;
+  name: string;
+  type: string;
+  size: number;
+};
 
 export function NewComplaintForm() {
-  const router = useRouter()
-  const showMapPin = useFeatureFlag("MAP_PIN")
-  
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [category, setCategory] = useState("TAXI_FRAUD")
-  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().split("T")[0])
-  const today = new Date().toISOString().split("T")[0]
-  
-  const [lat, setLat] = useState<number | null>(null)
-  const [lng, setLng] = useState<number | null>(null)
-  const [label, setLabel] = useState("")
-  
-  const [selectedFiles, setSelectedFiles] = useState<SelectedEvidenceFile[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-  
-  const [isPending, setIsPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const showMapPin = true;
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("TAXI_FRAUD");
+  const [incidentDate, setIncidentDate] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
+  const today = new Date().toISOString().split("T")[0];
+
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [label, setLabel] = useState("");
+
+  const [selectedFiles, setSelectedFiles] = useState<SelectedEvidenceFile[]>(
+    [],
+  );
+  const [isUploading, setIsUploading] = useState(false);
+
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelection = (files: FileList | null) => {
-    if (!files) return
+    if (!files) return;
 
-    const candidates = Array.from(files)
-    const allowed = [...selectedFiles.map((item) => item.file), ...candidates]
+    const candidates = Array.from(files);
+    const allowed = [...selectedFiles.map((item) => item.file), ...candidates];
 
     if (allowed.length > 5) {
-      toast.error("You can attach up to 5 evidence files.")
-      return
+      toast.error("You can attach up to 5 evidence files.");
+      return;
     }
 
-    const invalidFile = candidates.find((file) => file.size > 128 * 1024 * 1024)
+    const invalidFile = candidates.find(
+      (file) => file.size > 128 * 1024 * 1024,
+    );
     if (invalidFile) {
-      toast.error("Each file must be 128MB or smaller.")
-      return
+      toast.error("Each file must be 128MB or smaller.");
+      return;
     }
 
-    setSelectedFiles((current) => [...current, ...candidates.map((file) => ({ file }))])
-  }
+    setSelectedFiles((current) => [
+      ...current,
+      ...candidates.map((file) => ({ file })),
+    ]);
+  };
 
   const removeFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
-  }
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsPending(true)
-    setError(null)
+    e.preventDefault();
+    setIsPending(true);
+    setError(null);
 
-    const formData = new FormData()
-    formData.append("title", title)
-    formData.append("description", description)
-    formData.append("category", category)
-    formData.append("incidentDate", incidentDate)
-    
-    if (lat !== null) formData.append("locationLat", lat.toString())
-    if (lng !== null) formData.append("locationLng", lng.toString())
-    if (label) formData.append("locationLabel", label)
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("category", category);
+    formData.append("incidentDate", incidentDate);
 
-    let evidenceFiles: UploadedFile[] = []
+    if (lat !== null) formData.append("locationLat", lat.toString());
+    if (lng !== null) formData.append("locationLng", lng.toString());
+    if (label) formData.append("locationLabel", label);
+
+    console.log("[NewComplaintForm] submitting complaint payload", {
+      title,
+      category,
+      incidentDate,
+      locationLat: lat,
+      locationLng: lng,
+      locationLabel: label,
+      evidenceCount: selectedFiles.length,
+    });
+
+    let evidenceFiles: UploadedFile[] = [];
 
     if (selectedFiles.length > 0) {
-      setIsUploading(true)
+      setIsUploading(true);
       try {
         const response = await uploadFiles("evidenceUploader", {
           files: selectedFiles.map((item) => item.file),
-        })
+        });
 
         if (!response || response.length === 0) {
-          throw new Error("Evidence upload failed.")
+          throw new Error("Evidence upload failed.");
         }
 
         evidenceFiles = response.map((item, index) => ({
@@ -100,52 +131,55 @@ export function NewComplaintForm() {
           name: selectedFiles[index]?.file.name ?? `file-${index}`,
           type: selectedFiles[index]?.file.type ?? "application/octet-stream",
           size: selectedFiles[index]?.file.size ?? 0,
-        }))
+        }));
       } catch (err: any) {
-        console.error(err)
-        setError(err?.message || "Failed to upload evidence files.")
-        toast.error(err?.message || "Failed to upload evidence files.")
-        setIsPending(false)
-        setIsUploading(false)
-        return
+        console.error(err);
+        setError(err?.message || "Failed to upload evidence files.");
+        toast.error(err?.message || "Failed to upload evidence files.");
+        setIsPending(false);
+        setIsUploading(false);
+        return;
       } finally {
-        setIsUploading(false)
+        setIsUploading(false);
       }
     }
 
     evidenceFiles.forEach((f, i) => {
-      formData.append(`evidence[${i}][url]`, f.fileUrl)
-      formData.append(`evidence[${i}][name]`, f.name)
-      formData.append(`evidence[${i}][type]`, f.type)
-      formData.append(`evidence[${i}][size]`, f.size.toString())
-    })
+      formData.append(`evidence[${i}][url]`, f.fileUrl);
+      formData.append(`evidence[${i}][name]`, f.name);
+      formData.append(`evidence[${i}][type]`, f.type);
+      formData.append(`evidence[${i}][size]`, f.size.toString());
+    });
 
     try {
-      const res = await createComplaint(formData)
+      const res = await createComplaint(formData);
       if (res && !res.success) {
-        setError(res.error || "Failed to submit complaint.")
-        toast.error(res.error || "Failed to submit complaint.")
-        setIsPending(false)
+        setError(res.error || "Failed to submit complaint.");
+        toast.error(res.error || "Failed to submit complaint.");
+        setIsPending(false);
       } else {
-        toast.success("Complaint submitted successfully!")
-        router.push(`/dashboard/complaints/${res.id}`)
+        toast.success("Complaint submitted successfully!");
+        router.push(`/dashboard/complaints/${res.id}`);
       }
     } catch (err: any) {
-      console.error(err)
-      setError("An unexpected error occurred.")
-      toast.error("An unexpected error occurred.")
-      setIsPending(false)
+      console.error(err);
+      setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
+      setIsPending(false);
     }
-  }
+  };
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith("image/")) return <Image size={18} weight="fill" />
-    if (type.startsWith("video/")) return <Video size={18} weight="fill" />
-    return <FileText size={18} weight="fill" />
-  }
+    if (type.startsWith("image/")) return <Image size={18} weight="fill" />;
+    if (type.startsWith("video/")) return <Video size={18} weight="fill" />;
+    return <FileText size={18} weight="fill" />;
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border border-border bg-card p-6 shadow-sm">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-6 rounded-xl border border-border bg-card p-6 shadow-sm"
+    >
       {error && (
         <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive font-medium">
           {error}
@@ -155,7 +189,10 @@ export function NewComplaintForm() {
       <div className="space-y-4">
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
-            <label htmlFor="title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="title"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Complaint Title
             </label>
             <span className="text-[10px] text-muted-foreground font-mono">
@@ -177,7 +214,10 @@ export function NewComplaintForm() {
 
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
-            <label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="description"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Detailed Description
             </label>
             <span className="text-[10px] text-muted-foreground font-mono">
@@ -200,7 +240,10 @@ export function NewComplaintForm() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <label htmlFor="category" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="category"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Category
             </label>
             <select
@@ -223,7 +266,10 @@ export function NewComplaintForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="incidentDate" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="incidentDate"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Incident Date
             </label>
             <Input
@@ -247,21 +293,25 @@ export function NewComplaintForm() {
             </label>
             <MapPinPicker
               onLocationSelect={(loc) => {
-                setLat(loc.lat)
-                setLng(loc.lng)
-                setLabel(loc.label || "")
+                setLat(loc.lat);
+                setLng(loc.lng);
+                setLabel(loc.label || "");
               }}
               disabled={isPending}
             />
             {label && (
               <p className="text-xs text-primary font-medium mt-1">
-                Selected Location: {label} ({lat?.toFixed(4)}, {lng?.toFixed(4)})
+                Selected Location: {label} ({lat?.toFixed(4)}, {lng?.toFixed(4)}
+                )
               </p>
             )}
           </div>
         ) : (
           <div className="space-y-1.5">
-            <label htmlFor="locationLabel" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="locationLabel"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Incident Location (Address / Plain Text)
             </label>
             <Input
@@ -283,7 +333,9 @@ export function NewComplaintForm() {
           </label>
 
           <div className="grid gap-3 rounded-lg border border-dashed border-border bg-surface p-4">
-            <p className="text-sm text-foreground">Select files now, upload when the form is submitted.</p>
+            <p className="text-sm text-foreground">
+              Select files now, upload when the form is submitted.
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <label
                 htmlFor="evidenceFiles"
@@ -292,7 +344,9 @@ export function NewComplaintForm() {
                 <UploadSimple size={16} />
                 Choose files
               </label>
-              <span className="text-xs text-muted-foreground">Max 5 files · 128MB each</span>
+              <span className="text-xs text-muted-foreground">
+                Max 5 files · 128MB each
+              </span>
             </div>
             <input
               id="evidenceFiles"
@@ -307,12 +361,21 @@ export function NewComplaintForm() {
 
           {selectedFiles.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Selected files:</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                Selected files:
+              </p>
               <div className="flex flex-wrap gap-2">
                 {selectedFiles.map((item, index) => (
-                  <div key={index} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
-                    <span className="text-primary">{getFileIcon(item.file.type)}</span>
-                    <span className="text-sm truncate max-w-[200px]">{item.file.name}</span>
+                  <div
+                    key={index}
+                    className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5"
+                  >
+                    <span className="text-primary">
+                      {getFileIcon(item.file.type)}
+                    </span>
+                    <span className="text-sm truncate max-w-[200px]">
+                      {item.file.name}
+                    </span>
                     <span className="text-[10px] text-muted-foreground">
                       {(item.file.size / 1024 / 1024).toFixed(1)} MB
                     </span>
@@ -345,9 +408,13 @@ export function NewComplaintForm() {
         </Button>
         <Button type="submit" disabled={isPending || isUploading}>
           <Plus className="mr-2" size={16} weight="bold" />
-          {isPending ? "Submitting..." : isUploading ? "Uploading..." : "Submit Complaint"}
+          {isPending
+            ? "Submitting..."
+            : isUploading
+              ? "Uploading..."
+              : "Submit Complaint"}
         </Button>
       </div>
     </form>
-  )
+  );
 }

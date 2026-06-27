@@ -1,136 +1,234 @@
-import { FilePlus, FolderOpen, ShieldCheck, WarningCircle } from "@phosphor-icons/react/dist/ssr"
+import Link from "next/link";
+import {
+  CheckCircle,
+  GlobeHemisphereWest,
+  MapPin,
+  ShieldCheck,
+  Sparkle,
+  UsersThree,
+} from "@phosphor-icons/react/dist/ssr";
 
-import { ComplaintCard } from "@/components/complaint/complaint-card"
-import { ComplaintFeedSkeleton } from "@/components/complaint/complaint-feed-skeleton"
-import { FeedComposerCTA } from "@/components/complaint/feed-composer-cta"
-import { FeedFilterBar } from "@/components/complaint/feed-filter-bar"
-import { StatusTimeline } from "@/components/complaint/status-timeline"
-import { Navbar } from "@/components/layout/navbar"
-import { PageShell } from "@/components/layout/page-shell"
-import { EmptyState } from "@/components/ui/empty-state"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { PriorityBadge } from "@/components/ui/priority-badge"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
-import { StatusBadge } from "@/components/ui/status-badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+import { Navbar } from "@/components/layout/navbar";
+import { PageShell } from "@/components/layout/page-shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
-const sampleComplaint = {
-  id: "sample",
-  reference: "AWA-2026-0142",
-  title: "Taxi overcharged after airport pickup",
-  description:
-    "The driver changed the fare twice after leaving the terminal and refused to provide a receipt when asked.",
-  category: "Taxi fraud",
-  status: "INVESTIGATION" as const,
-  priority: "HIGH" as const,
-  lastUpdated: "12 min ago",
-  evidenceCount: 3,
-  responsePreview:
-    "Traffic Police has reviewed the receipt image and requested the taxi plate number for verification.",
-}
+const highlights = [
+  {
+    label: "Instant complaint reference",
+    detail:
+      "Get a case ID immediately and track every update from authorities.",
+    icon: MapPin,
+  },
+  {
+    label: "Tourist-first filing",
+    detail:
+      "Submit harassment, overcharging, safety, and service issues from anywhere.",
+    icon: GlobeHemisphereWest,
+  },
+  {
+    label: "Trusted local response",
+    detail:
+      "Authorities see your case clearly and can act faster with verified reports.",
+    icon: ShieldCheck,
+  },
+];
+
+const stepCards = [
+  {
+    title: "Register in minutes",
+    description:
+      "Create your account and verify your tourist profile before filing a complaint.",
+    icon: UsersThree,
+  },
+  {
+    title: "Submit your report",
+    description:
+      "Add what happened, upload evidence, and choose the right category for your issue.",
+    icon: Sparkle,
+  },
+  {
+    title: "Track progress",
+    description:
+      "Follow a live status feed and receive updates from the assigned authority.",
+    icon: CheckCircle,
+  },
+];
 
 export default function Home() {
   return (
     <>
       <Navbar />
       <PageShell>
-        <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-6">
-            <div className="rounded-lg border border-border/70 bg-surface p-5 shadow-[0_18px_60px_oklch(0.29_0.012_96_/_0.08)]">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <Badge variant="secondary">Design system foundation</Badge>
-                  <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                    Calm civic UI for complaint filing, tracking, and authority response.
-                  </h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    Awaaz uses shadcn primitives with a graphite and moss palette, warm stone
-                    surfaces, clay priority states, compact feed ergonomics, and visible accessibility
-                    states.
-                  </p>
-                </div>
-                <Button>
-                  <FilePlus weight="bold" />
-                  File complaint
+        <section className="grid gap-10 lg:grid-cols-[1.4fr_0.9fr]">
+          <div className="space-y-10">
+            <div className="overflow-hidden rounded-[2rem] border border-border/70 bg-surface p-8 shadow-[0_24px_90px_rgba(20,20,20,0.06)] sm:p-12">
+              <Badge variant="secondary">Tourist grievance desk</Badge>
+              <div className="mt-8 max-w-3xl">
+                <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+                  Awaaz helps travellers report unsafe service, scams and civic
+                  incidents with confidence.
+                </h1>
+                <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+                  File complaints, upload evidence, and follow every response
+                  from local authorities in one calm, easy-to-use platform.
+                </p>
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button asChild size="lg">
+                  <Link href="/register">Register free</Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/login">Sign in</Link>
                 </Button>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                ["Open complaints", "12", ShieldCheck],
-                ["Needs evidence", "03", WarningCircle],
-                ["Resolved this month", "28", FolderOpen],
-              ].map(([label, value, Icon]) => (
-                <Card key={label as string} className="bg-surface">
-                  <CardContent className="flex items-center justify-between p-5">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{label as string}</p>
-                      <p className="mt-2 text-3xl font-semibold tracking-tight">{value as string}</p>
+              {highlights.map((item) => (
+                <Card key={item.label} className="bg-surface">
+                  <CardContent className="flex h-full flex-col justify-between gap-5 p-6">
+                    <div className="flex items-center gap-3 text-primary">
+                      <item.icon size={24} weight="duotone" />
+                      <p className="text-sm font-semibold text-foreground">
+                        {item.label}
+                      </p>
                     </div>
-                    <div className="flex size-10 items-center justify-center rounded-md border border-primary/15 bg-secondary text-primary">
-                      <Icon size={20} weight="duotone" />
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {item.detail}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-3">
+              {stepCards.map((step) => (
+                <Card key={step.title} className="bg-surface">
+                  <CardContent className="space-y-4 p-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <step.icon size={24} weight="duotone" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-foreground">
+                        {step.title}
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {step.description}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            <FeedComposerCTA />
-            <FeedFilterBar activeFilters={["Investigation", "High priority", "Taxi fraud"]} />
-            <ComplaintCard {...sampleComplaint} />
+            <Card className="bg-surface">
+              <CardHeader>
+                <CardTitle>Why travellers choose Awaaz</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 text-sm leading-6 text-muted-foreground">
+                <p>
+                  Awaaz is built for people who need a simple way to report
+                  city-level issues without navigating complex bureaucratic
+                  portals.
+                </p>
+                <p>
+                  Every report gets a tracking ID, clear status updates, and a
+                  direct authority response path so you can move on with your
+                  trip.
+                </p>
+                <p>
+                  The platform is focused on safety, service trust, and timely
+                  follow-up from local agencies, not on subscription or
+                  enterprise features.
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
           <aside className="space-y-6">
             <Card className="bg-surface">
               <CardHeader>
-                <CardTitle>Tokens</CardTitle>
+                <CardTitle>Trusted categories</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="h-12 rounded-md border border-border bg-primary" />
-                  <div className="h-12 rounded-md border border-border bg-background" />
-                  <div className="h-12 rounded-md border border-border bg-priority" />
-                  <div className="h-12 rounded-md border border-border bg-secondary" />
-                </div>
-                <Separator />
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge status="SUBMITTED" />
-                  <StatusBadge status="UNDER_REVIEW" />
-                  <StatusBadge status="ASSIGNED" />
-                  <StatusBadge status="INVESTIGATION" />
-                  <StatusBadge status="RESOLVED" />
-                  <PriorityBadge priority="URGENT" />
+              <CardContent className="space-y-4 p-6">
+                <div className="grid gap-2">
+                  {[
+                    "Taxi or ride-share scams",
+                    "Harassment or unsafe service",
+                    "Lost or stolen belongings",
+                    "Public transport issues",
+                    "Hotel or booking fraud",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-sm text-foreground"
+                    >
+                      {item}
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
-            <StatusTimeline
-              currentStatus="INVESTIGATION"
-              reachedAt={{
-                SUBMITTED: "Jun 24, 2026",
-                UNDER_REVIEW: "Jun 25, 2026",
-                ASSIGNED: "Jun 26, 2026",
-              }}
-            />
+            <Card className="bg-surface">
+              <CardHeader>
+                <CardTitle>What you get</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 p-6 text-sm leading-6 text-muted-foreground">
+                <div className="space-y-2">
+                  <p className="font-semibold text-foreground">
+                    Clear case tracking
+                  </p>
+                  <p>
+                    Know when your complaint is reviewed, assigned, and
+                    investigated.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-foreground">
+                    Evidence upload
+                  </p>
+                  <p>
+                    Attach photos, documents, or screenshots that help
+                    authorities act quickly.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-foreground">
+                    Fast follow-up
+                  </p>
+                  <p>
+                    Local authorities receive your report in a format they can
+                    process without delay.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="bg-surface">
               <CardHeader>
-                <CardTitle>Form states</CardTitle>
+                <CardTitle>Ready to report?</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Input placeholder="Complaint title" />
-                <Textarea placeholder="Describe what happened" />
-                <Progress value={62} />
-                <div className="flex gap-2">
-                  <Button size="sm">Submit</Button>
-                  <Button size="sm" variant="outline">
-                    Save draft
+              <CardContent className="space-y-5 p-6">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Use Awaaz as a travel companion to submit civic complaints
+                  confidently and keep track of every step.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button asChild size="lg" className="min-w-35">
+                    <Link href="/register">Register</Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="min-w-35"
+                  >
+                    <Link href="/login">Sign in</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -138,38 +236,40 @@ export default function Home() {
           </aside>
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-2">
-          <Tabs defaultValue="loading" className="rounded-lg border bg-surface p-4">
-            <TabsList>
-              <TabsTrigger value="loading">Loading</TabsTrigger>
-              <TabsTrigger value="empty">Empty</TabsTrigger>
-            </TabsList>
-            <TabsContent value="loading" className="mt-4">
-              <ComplaintFeedSkeleton />
-            </TabsContent>
-            <TabsContent value="empty" className="mt-4">
-              <EmptyState
-                icon={FolderOpen}
-                title="No complaints match these filters"
-                description="Clear filters or adjust the date range to widen the feed."
-                actionLabel="Clear filters"
-              />
-            </TabsContent>
-          </Tabs>
+        <Separator className="my-10" />
 
-          <Card className="bg-surface">
-            <CardHeader>
-              <CardTitle>Design rules encoded</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
-              <p>All data surfaces account for loading, empty, and error-ready composition.</p>
-              <p>Status and priority colors are centralized through constants and semantic badges.</p>
-              <p>Feed controls stay sticky and visible, with active filters shown as removable chips.</p>
-              <p>Reference numbers use mono type, while the main interface stays readable sans-serif.</p>
-            </CardContent>
-          </Card>
+        <section className="grid gap-8 rounded-[2rem] border border-border/70 bg-surface p-8 shadow-[0_24px_90px_rgba(20,20,20,0.06)] sm:p-10">
+          <div className="grid gap-2 text-center">
+            <p className="text-sm uppercase tracking-[0.22em] text-muted-foreground">
+              Built for tourist trust
+            </p>
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              A single place to file complaints, follow responses, and feel
+              supported while traveling.
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-3xl bg-background/80 p-6 text-sm leading-6 text-muted-foreground shadow-[inset_0_1px_0_rgb(255,255,255,0.6)]">
+              <p className="font-semibold text-foreground">
+                Mobile-friendly flow
+              </p>
+              <p className="mt-2">
+                Designed for quick case filing on a phone in unfamiliar cities.
+              </p>
+            </div>
+            <div className="rounded-3xl bg-background/80 p-6 text-sm leading-6 text-muted-foreground shadow-[inset_0_1px_0_rgb(255,255,255,0.6)]">
+              <p className="font-semibold text-foreground">
+                Clear authority handoff
+              </p>
+              <p className="mt-2">
+                Reports are formatted so local agencies can respond with
+                confidence.
+              </p>
+            </div>
+          </div>
         </section>
       </PageShell>
     </>
-  )
+  );
 }

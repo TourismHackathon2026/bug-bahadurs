@@ -1,22 +1,28 @@
-"use client"
+"use client";
 
-import { useMemo, useState, type ChangeEvent, type FormEvent } from "react"
+import Link from "next/link";
+import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
-import { ArrowLeft, ArrowRight, UploadSimple, UserPlus } from "@phosphor-icons/react"
+import {
+  ArrowLeft,
+  ArrowRight,
+  UploadSimple,
+  UserPlus,
+} from "@phosphor-icons/react";
 
-import { registerTourist } from "@/actions/auth.actions"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { registerTourist } from "@/actions/auth.actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-import { uploadFiles } from "@/lib/uploadthing"
+import { uploadFiles } from "@/lib/uploadthing";
 
 type RegistrationDraft = {
-  displayName: string
-  email: string
-  password: string
-  documentType: string
-  documentRef: string
-}
+  displayName: string;
+  email: string;
+  password: string;
+  documentType: string;
+  documentRef: string;
+};
 
 const initialDraft: RegistrationDraft = {
   displayName: "",
@@ -24,146 +30,170 @@ const initialDraft: RegistrationDraft = {
   password: "",
   documentType: "PASSPORT",
   documentRef: "",
-}
+};
 
 function maskDocumentRef(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return "Not entered yet"
-  if (trimmed.length <= 4) return `****${trimmed}`
-  return `${"*".repeat(Math.max(trimmed.length - 4, 4))}${trimmed.slice(-4)}`
+  const trimmed = value.trim();
+  if (!trimmed) return "Not entered yet";
+  if (trimmed.length <= 4) return `****${trimmed}`;
+  return `${"*".repeat(Math.max(trimmed.length - 4, 4))}${trimmed.slice(-4)}`;
 }
 
 export function RegistrationForm() {
-  const [step, setStep] = useState(1)
-  const [draft, setDraft] = useState<RegistrationDraft>(initialDraft)
-  const [documentFile, setDocumentFile] = useState<File | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [step, setStep] = useState(1);
+  const [draft, setDraft] = useState<RegistrationDraft>(initialDraft);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const documentPreview = useMemo(() => maskDocumentRef(draft.documentRef), [draft.documentRef])
+  const documentPreview = useMemo(
+    () => maskDocumentRef(draft.documentRef),
+    [draft.documentRef],
+  );
 
   const updateField =
-    (field: keyof RegistrationDraft) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      setDraft((current) => ({ ...current, [field]: event.target.value }))
-    }
+    (field: keyof RegistrationDraft) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setDraft((current) => ({ ...current, [field]: event.target.value }));
+    };
 
   const handleNext = () => {
-    setError(null)
+    setError(null);
 
     if (step === 1) {
-      if (!draft.displayName.trim() || !draft.email.trim() || !draft.password.trim()) {
-        setError("Fill in your name, email, and password to continue.")
-        return
+      if (
+        !draft.displayName.trim() ||
+        !draft.email.trim() ||
+        !draft.password.trim()
+      ) {
+        setError("Fill in your name, email, and password to continue.");
+        return;
       }
 
       if (!draft.email.includes("@")) {
-        setError("Enter a valid email address.")
-        return
+        setError("Enter a valid email address.");
+        return;
       }
 
       if (draft.password.length < 6) {
-        setError("Password must be at least 6 characters long.")
-        return
+        setError("Password must be at least 6 characters long.");
+        return;
       }
 
-      setStep(2)
-      return
+      setStep(2);
+      return;
     }
 
     if (step === 2) {
       if (!draft.documentType.trim() || !draft.documentRef.trim()) {
-        setError("Add your document type and document number to continue.")
-        return
+        setError("Add your document type and document number to continue.");
+        return;
       }
 
       if (!documentFile) {
-        setError("Upload a passport or identity document to continue.")
-        return
+        setError("Upload a passport or identity document to continue.");
+        return;
       }
 
-      setStep(3)
+      setStep(3);
     }
-  }
+  };
 
   const handlePrev = () => {
-    setError(null)
-    setStep((current) => Math.max(current - 1, 1))
-  }
+    setError(null);
+    setStep((current) => Math.max(current - 1, 1));
+  };
 
   const uploadDocument = async () => {
     if (!documentFile) {
-      throw new Error("A document file is required.")
+      throw new Error("A document file is required.");
     }
 
     const response = await uploadFiles("documentUploader", {
       files: [documentFile],
-    })
+    });
 
     if (!response || response.length === 0) {
-      throw new Error("Document upload failed.")
+      throw new Error("Document upload failed.");
     }
 
-    return response[0].url
-  }
+    return response[0].url;
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+    event.preventDefault();
 
     if (step < 3) {
-      handleNext()
-      return
+      handleNext();
+      return;
     }
 
-    setError(null)
-    setLoading(true)
+    setError(null);
+    setLoading(true);
 
     try {
-      const formData = new FormData()
-      formData.set("displayName", draft.displayName)
-      formData.set("email", draft.email)
-      formData.set("password", draft.password)
-      formData.set("documentType", draft.documentType)
-      formData.set("documentRef", draft.documentRef)
+      const formData = new FormData();
+      formData.set("displayName", draft.displayName);
+      formData.set("email", draft.email);
+      formData.set("password", draft.password);
+      formData.set("documentType", draft.documentType);
+      formData.set("documentRef", draft.documentRef);
 
-      const documentUrl = await uploadDocument()
-      formData.set("documentUrl", documentUrl)
+      const documentUrl = await uploadDocument();
+      formData.set("documentUrl", documentUrl);
 
-      const result = await registerTourist(formData)
+      const result = await registerTourist(formData);
       if (result.success) {
-        setSuccess(true)
-        return
+        setSuccess(true);
+        return;
       }
 
-      setError(result.error || "Registration failed.")
+      setError(result.error || "Registration failed.");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "An unexpected error occurred.")
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "An unexpected error occurred.",
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   if (success) {
     return (
       <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 text-center shadow-sm">
-        <h2 className="text-2xl font-bold tracking-tight text-primary">Application Submitted</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-primary">
+          Application Submitted
+        </h2>
         <p className="mt-4 text-sm text-muted-foreground">
-          Your tourist registration is pending approval. You will receive an email with your 8-digit Login ID and next steps once an administrator reviews it.
+          Your tourist registration is pending approval. You will receive an
+          email with your 8-digit Login ID and next steps once an administrator
+          reviews it.
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-sm">
       <div className="flex flex-col items-center text-center">
-        <h2 className="text-2xl font-bold tracking-tight">Create your account</h2>
+        <h2 className="text-2xl font-bold tracking-tight">
+          Create your account
+        </h2>
         <p className="mt-1 text-sm text-muted-foreground">Step {step} of 3</p>
 
         <div className="mt-4 flex w-full max-w-xs justify-between gap-2">
-          <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? "bg-primary" : "bg-muted"}`} />
-          <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? "bg-primary" : "bg-muted"}`} />
-          <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? "bg-primary" : "bg-muted"}`} />
+          <div
+            className={`h-1.5 flex-1 rounded-full ${step >= 1 ? "bg-primary" : "bg-muted"}`}
+          />
+          <div
+            className={`h-1.5 flex-1 rounded-full ${step >= 2 ? "bg-primary" : "bg-muted"}`}
+          />
+          <div
+            className={`h-1.5 flex-1 rounded-full ${step >= 3 ? "bg-primary" : "bg-muted"}`}
+          />
         </div>
       </div>
 
@@ -178,7 +208,10 @@ export function RegistrationForm() {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Personal Information</h3>
             <div className="space-y-1.5">
-              <label htmlFor="displayName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="displayName"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Full Name
               </label>
               <Input
@@ -193,7 +226,10 @@ export function RegistrationForm() {
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="email"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Email Address
               </label>
               <Input
@@ -208,7 +244,10 @@ export function RegistrationForm() {
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="password"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Password
               </label>
               <Input
@@ -229,7 +268,10 @@ export function RegistrationForm() {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Identity Verification</h3>
             <div className="space-y-1.5">
-              <label htmlFor="documentType" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="documentType"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Document Type
               </label>
               <select
@@ -246,7 +288,10 @@ export function RegistrationForm() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="documentRef" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="documentRef"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Document Number
               </label>
               <Input
@@ -261,7 +306,10 @@ export function RegistrationForm() {
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="documentFile" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="documentFile"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Identity Document
               </label>
               <Input
@@ -269,12 +317,16 @@ export function RegistrationForm() {
                 name="documentFile"
                 type="file"
                 accept="image/*,application/pdf"
-                onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
+                onChange={(event) =>
+                  setDocumentFile(event.target.files?.[0] ?? null)
+                }
                 required
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">
-                {documentFile ? documentFile.name : "Upload a passport scan, national ID, or a clear photo of the document."}
+                {documentFile
+                  ? documentFile.name
+                  : "Upload a passport scan, national ID, or a clear photo of the document."}
               </p>
             </div>
           </div>
@@ -286,34 +338,51 @@ export function RegistrationForm() {
             <div className="space-y-3 rounded-md border border-border bg-surface p-4 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Full name</span>
-                <span className="text-right font-medium">{draft.displayName || "Not entered yet"}</span>
+                <span className="text-right font-medium">
+                  {draft.displayName || "Not entered yet"}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Email</span>
-                <span className="text-right font-medium">{draft.email || "Not entered yet"}</span>
+                <span className="text-right font-medium">
+                  {draft.email || "Not entered yet"}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Document type</span>
-                <span className="text-right font-medium">{draft.documentType}</span>
+                <span className="text-right font-medium">
+                  {draft.documentType}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Document number</span>
-                <span className="text-right font-mono text-xs">{documentPreview}</span>
+                <span className="text-right font-mono text-xs">
+                  {documentPreview}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">File</span>
-                <span className="text-right font-medium">{documentFile?.name || "Not selected"}</span>
+                <span className="text-right font-medium">
+                  {documentFile?.name || "Not selected"}
+                </span>
               </div>
             </div>
             <p className="text-xs leading-5 text-muted-foreground">
-              Please confirm your details before submitting your registration. By registering, you confirm the details provided are authentic.
+              Please confirm your details before submitting your registration.
+              By registering, you confirm the details provided are authentic.
             </p>
           </div>
         )}
 
         <div className="flex gap-3">
           {step > 1 && (
-            <Button type="button" variant="secondary" onClick={handlePrev} className="flex-1" disabled={loading}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handlePrev}
+              className="flex-1"
+              disabled={loading}
+            >
               <ArrowLeft className="mr-2" size={16} />
               Back
             </Button>
@@ -338,6 +407,18 @@ export function RegistrationForm() {
           )}
         </div>
       </form>
+
+      <div className="mt-6 text-center text-sm">
+        <p className="text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-semibold text-primary hover:underline"
+          >
+            Sign in here
+          </Link>
+        </p>
+      </div>
     </div>
-  )
+  );
 }

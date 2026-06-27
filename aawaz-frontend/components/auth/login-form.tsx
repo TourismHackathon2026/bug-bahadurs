@@ -1,27 +1,28 @@
-"use client"
+"use client";
 
-import { useActionState } from "react"
+import Link from "next/link";
+import { useActionState } from "react";
 
-import { SignIn, ShieldCheck } from "@phosphor-icons/react"
+import { SignIn, ShieldCheck } from "@phosphor-icons/react";
 
-import { login } from "@/actions/auth.actions"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { login } from "@/actions/auth.actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type AuthActionState = {
-  success: boolean
-  error?: string
-}
+  success: boolean;
+  error?: string;
+};
 
 const initialState: AuthActionState = {
   success: false,
-}
+};
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(
     async (_state: AuthActionState, formData: FormData) => login(formData),
-    initialState
-  )
+    initialState,
+  );
 
   return (
     <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-sm">
@@ -29,7 +30,9 @@ export function LoginForm() {
         <div className="flex size-12 items-center justify-center rounded-lg border border-primary/20 bg-secondary text-primary">
           <ShieldCheck size={28} weight="fill" />
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight">Sign in to Awaaz</h2>
+        <h2 className="mt-4 text-2xl font-bold tracking-tight">
+          Sign in to Awaaz
+        </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Enter your email address and password
         </p>
@@ -44,7 +47,10 @@ export function LoginForm() {
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="email"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Email address
             </label>
             <Input
@@ -59,7 +65,10 @@ export function LoginForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="password"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Password
             </label>
             <Input
@@ -84,6 +93,18 @@ export function LoginForm() {
           )}
         </Button>
       </form>
+
+      <div className="mt-6 text-center text-sm">
+        <p className="text-muted-foreground">
+          Don't have an account?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-primary hover:underline"
+          >
+            Register here
+          </Link>
+        </p>
+      </div>
     </div>
-  )
+  );
 }
