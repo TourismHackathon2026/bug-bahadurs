@@ -25,15 +25,21 @@ export interface ComplaintInput {
   locationLabel?: string
 }
 
+type InputRecord = Record<string, unknown>
+
+function isInputRecord(input: unknown): input is InputRecord {
+  return input !== null && typeof input === "object" && !Array.isArray(input)
+}
+
 /**
  * Basic validator for login input
  */
-export function validateLoginInput(input: any): {
+export function validateLoginInput(input: unknown): {
   success: boolean
   data?: LoginInput
   error?: string
 } {
-  if (!input || typeof input !== "object") {
+  if (!isInputRecord(input)) {
     return { success: false, error: "Invalid input shape" }
   }
   
@@ -51,12 +57,12 @@ export function validateLoginInput(input: any): {
 /**
  * Basic validator for registration input
  */
-export function validateRegisterInput(input: any): {
+export function validateRegisterInput(input: unknown): {
   success: boolean
   data?: RegisterInput
   error?: string
 } {
-  if (!input || typeof input !== "object") {
+  if (!isInputRecord(input)) {
     return { success: false, error: "Invalid input shape" }
   }
 
@@ -87,12 +93,12 @@ export function validateRegisterInput(input: any): {
 /**
  * Basic validator for complaint submission input
  */
-export function validateComplaintInput(input: any): {
+export function validateComplaintInput(input: unknown): {
   success: boolean
   data?: ComplaintInput
   error?: string
 } {
-  if (!input || typeof input !== "object") {
+  if (!isInputRecord(input)) {
     return { success: false, error: "Invalid input shape" }
   }
 
@@ -107,7 +113,7 @@ export function validateComplaintInput(input: any): {
   if (!category || typeof category !== "string") {
     return { success: false, error: "Category is required" }
   }
-  if (!incidentDate || isNaN(Date.parse(incidentDate))) {
+  if (typeof incidentDate !== "string" || isNaN(Date.parse(incidentDate))) {
     return { success: false, error: "Valid incident date is required" }
   }
 

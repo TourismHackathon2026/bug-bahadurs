@@ -1,32 +1,27 @@
 "use client"
 
-import { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { ShieldCheck, SignIn } from "@phosphor-icons/react"
+import { useActionState } from "react"
+
+import { SignIn, ShieldCheck } from "@phosphor-icons/react"
+
 import { login } from "@/actions/auth.actions"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+type AuthActionState = {
+  success: boolean
+  error?: string
+}
+
+const initialState: AuthActionState = {
+  success: false,
+}
 
 export function LoginForm() {
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    const formData = new FormData(e.currentTarget)
-    try {
-      const result = await login(formData)
-      if (result && !result.success) {
-        setError(result.error || "Failed to sign in")
-      }
-    } catch (err) {
-      setError("An unexpected error occurred")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [state, formAction, pending] = useActionState(
+    async (_state: AuthActionState, formData: FormData) => login(formData),
+    initialState
+  )
 
   return (
     <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-sm">
@@ -40,10 +35,10 @@ export function LoginForm() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-        {error && (
-          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive font-medium border border-destructive/25 animate-in fade-in">
-            {error}
+      <form action={formAction} className="mt-8 space-y-6">
+        {state.error && (
+          <div className="rounded-md border border-destructive/25 bg-destructive/10 p-3 text-sm font-medium text-destructive animate-in fade-in">
+            {state.error}
           </div>
         )}
 
@@ -56,9 +51,10 @@ export function LoginForm() {
               id="loginId"
               name="loginId"
               type="text"
-              placeholder="e.g. 12345678"
+              inputMode="numeric"
+              placeholder="12345678"
               required
-              disabled={loading}
+              disabled={pending}
               pattern="[0-9]{8}"
               maxLength={8}
             />
@@ -72,15 +68,15 @@ export function LoginForm() {
               id="password"
               name="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="********"
               required
-              disabled={loading}
+              disabled={pending}
             />
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? (
+        <Button type="submit" className="w-full" disabled={pending}>
+          {pending ? (
             "Signing in..."
           ) : (
             <>
