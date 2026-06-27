@@ -84,12 +84,9 @@ export async function createComplaint(formData: FormData): Promise<{ success: bo
       evidence,
     })
 
-    // Enqueue background AI job if feature-flagged
-    if (process.env.FF_AI_CATEGORIZATION === "true") {
-      categorizeComplaint(complaint.id, complaint.description).catch((err) => {
-        console.error("[Action:complaint] Background AI categorization failed", err)
-      })
-    }
+    void categorizeComplaint(complaint.id, complaint.description).catch((err) => {
+      console.error("[Action:complaint] Background AI categorization failed", err)
+    })
 
     revalidatePath("/dashboard")
     revalidatePath("/dashboard/complaints")

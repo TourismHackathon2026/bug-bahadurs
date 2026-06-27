@@ -28,6 +28,10 @@ export async function middleware(request: NextRequest) {
   const session = token ? await verifySessionToken(token) : null
   const requiredRole = getRequiredRole(pathname)
 
+  if (pathname === "/" && session) {
+    return NextResponse.redirect(new URL(getRoleHome(session.role), request.url))
+  }
+
   if ((pathname === "/login" || pathname === "/register") && session) {
     return NextResponse.redirect(new URL(getRoleHome(session.role), request.url))
   }

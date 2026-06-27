@@ -189,6 +189,11 @@ export async function getComplaintById(id: string) {
           id: true,
           displayName: true,
           email: true,
+          authorityProfile: {
+            select: {
+              authorityType: true,
+            },
+          },
         },
       },
       statusEvents: {

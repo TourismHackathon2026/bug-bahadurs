@@ -24,6 +24,7 @@ export type ComplaintCardProps = {
   lastUpdated: string
   evidenceCount: number
   responsePreview?: string
+  href?: string
 }
 
 export function ComplaintCard({
@@ -37,6 +38,7 @@ export function ComplaintCard({
   lastUpdated,
   evidenceCount,
   responsePreview,
+  href,
 }: ComplaintCardProps) {
   return (
     <Card className="overflow-hidden border-border/70 bg-surface shadow-[0_18px_60px_oklch(0.29_0.012_96_/_0.08)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_70px_oklch(0.29_0.012_96_/_0.12)]">
@@ -79,7 +81,7 @@ export function ComplaintCard({
       <CardFooter className="justify-between border-t bg-surface-strong/50">
         <span className="text-xs text-muted-foreground">Status updates sync live</span>
         <Button asChild variant="ghost" size="sm">
-          <Link href={`/dashboard/complaints/${id}`}>
+          <Link href={href ?? `/dashboard/complaints/${id}`}>
             Open
             <ArrowRight />
           </Link>
