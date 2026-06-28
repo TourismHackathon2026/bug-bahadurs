@@ -248,3 +248,182 @@ export async function categorizeComplaint(
   );
   return aiResult;
 }
+
+interface VoiceComplaintFields {
+  title: string;
+  description: string;
+  category: string;
+}
+
+function buildVoiceExtractionPrompt(voiceTranscript: string): string {
+  return `You are a complaint processing assistant for a civic tourism platform in Nepal.
+A tourist has reported an incident via voice. Your task is to extract and structure their complaint into a JSON format.
+
+IMPORTANT: Return ONLY a valid JSON object with NO additional text, markdown, or explanations.
+
+The JSON must have these exact keys:
+{
+  "title": "A concise 2-5 word summary of the complaint (e.g., 'Taxi overcharged at airport')",
+  "description": "The full detailed complaint preserving all original details mentioned",
+  "category": "One category: TAXI_FRAUD, HOTEL_ISSUE, TREKKING_SAFETY, OVERCHARGING, HARASSMENT, THEFT, or OTHER"
+}
+
+Voice Transcript:
+"${voiceTranscript}"
+
+Return ONLY the JSON object, nothing else.`;
+}
+
+export async function extractVoiceComplaint(
+  voiceTranscript: string,
+): Promise<VoiceComplaintFields | null> {
+  console.log(
+    "[Service:AI] extractVoiceComplaint START - transcript length:",
+    voiceTranscript.length,
+  );
+
+  if (!NVIDIA_API_KEY) {
+    console.warn(
+      "[Service:AI] Missing NVIDIA_API_KEY. Skipping voice complaint extraction.",
+    );
+    return null;
+  }
+
+  if (!voiceTranscript.trim()) {
+    console.warn("[Service:AI] Voice transcript is empty");
+    return null;
+  }
+
+  const sanitizedTranscript = redactPII(voiceTranscript);
+  const payload = {
+    model: NVIDIA_MODEL,
+    messages: [
+      {
+        role: "user",
+        content: buildVoiceExtractionPrompt(sanitizedTranscript),
+      },
+    ],
+    max_tokens: 256,
+    temperature: 0.2,
+    top_p: 1.0,
+    frequency_penalty: 0.0,
+    presence_penalty: 0.0,
+    stream: false,
+  };
+
+  try {
+    const response = await fetch(NVIDIA_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${NVIDIA_API_KEY}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    console.log("RESPONSE", response)
+    console.log(
+      "[Service:AI] NVIDIA API response status for voice extraction:",
+      response.status,
+    );
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      console.error(
+        `[Service:AI] NVIDIA API voice extraction failed: ${response.status}`,
+        responseText,
+      );
+      return null;
+    }
+
+    const responseJson = await response.json().catch((error) => {
+      console.error("[Service:AI] Failed to parse voice extraction response", error);
+      return null;
+    });
+
+    if (!responseJson) {
+      console.error("[Service:AI] Response JSON is null");
+      return null;
+    }
+
+    const content = getTextFromAiResponse(responseJson);
+    if (!content) {
+      console.error(
+        "[Service:AI] Voice extraction response missing text content. Response structure:",
+        JSON.stringify(responseJson),
+      );
+      return null;
+    }
+
+    console.log("[Service:AI] Extracted text from AI response:", content.substring(0, 500));
+
+    // Parse JSON from response - handle multiple possible formats
+    let parsed;
+    try {
+      // First try: direct JSON parse
+      parsed = JSON.parse(content.trim());
+      console.log("[Service:AI] Successfully parsed JSON directly from response");
+    } catch (e) {
+      console.warn("[Service:AI] Direct JSON parse failed, attempting to extract JSON from text");
+      // Second try: extract JSON from markdown or other text
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error(
+          "[Service:AI] Could not find JSON in voice extraction response. Full content:",
+          content,
+        );
+        return null;
+      }
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+        console.log("[Service:AI] Successfully extracted and parsed JSON from text");
+      } catch (parseError) {
+        console.error(
+          "[Service:AI] Failed to parse extracted JSON string:",
+          jsonMatch[0],
+          parseError,
+        );
+        return null;
+      }
+    }
+
+    // Validate parsed object
+    if (!parsed || typeof parsed !== "object") {
+      console.error("[Service:AI] Parsed result is not a valid object:", parsed);
+      return null;
+    }
+
+    const result: VoiceComplaintFields = {
+      title: typeof parsed.title === "string" ? parsed.title.trim() : "",
+      description:
+        typeof parsed.description === "string"
+          ? parsed.description.trim()
+          : "",
+      category:
+        typeof parsed.category === "string" ? parsed.category.trim() : "OTHER",
+    };
+
+    if (!result.title) {
+      console.error("[Service:AI] Missing title field in voice extraction response", parsed);
+      return null;
+    }
+
+    if (!result.description) {
+      console.error(
+        "[Service:AI] Missing description field in voice extraction response",
+        parsed,
+      );
+      return null;
+    }
+
+    console.log("[Service:AI] Voice complaint extracted successfully:", {
+      titleLength: result.title.length,
+      descriptionLength: result.description.length,
+      category: result.category,
+    });
+    return result;
+  } catch (error) {
+    console.error("[Service:AI] Voice complaint extraction error:", error);
+    return null;
+  }
+}

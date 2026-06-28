@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MapPinPickerLazy as MapPinPicker } from "@/components/map/map-pin-picker-lazy";
+import { VoiceComplaintRecorder } from "@/components/complaint/voice-complaint-recorder";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { createComplaint } from "@/actions/complaint.actions";
 import { uploadFiles } from "@/lib/uploadthing";
@@ -67,6 +68,18 @@ export function NewComplaintForm() {
 
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle voice complaint extraction
+  const handleVoiceComplaintExtracted = (data: {
+    title: string;
+    description: string;
+    category: string;
+  }) => {
+    setTitle(data.title);
+    setDescription(data.description);
+    setCategory(data.category);
+    toast.success("Complaint fields populated from voice!");
+  };
 
   // Debounced address search using Nominatim API
   const handleAddressSearch = useCallback(
@@ -258,6 +271,12 @@ export function NewComplaintForm() {
           {error}
         </div>
       )}
+
+      {/* Voice Complaint Recorder */}
+      <VoiceComplaintRecorder
+        onComplaintExtracted={handleVoiceComplaintExtracted}
+        disabled={isPending}
+      />
 
       <div className="space-y-4">
         <div className="space-y-1.5">

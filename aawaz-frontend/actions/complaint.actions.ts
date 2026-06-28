@@ -9,7 +9,7 @@ import {
   createComplaint as repoCreateComplaint,
   updateComplaintStatus as repoUpdateComplaintStatus,
 } from "@/server/complaints"
-import { categorizeComplaint } from "@/server/ai"
+import { categorizeComplaint, extractVoiceComplaint as extractVoiceComplaintAi } from "@/server/ai"
 import { notifyInTx } from "@/services/notification"
 
 const complaintSchema = z.object({
@@ -229,5 +229,56 @@ export async function requestEvidenceAction(
   } catch (error) {
     console.error("[Action:complaint] requestEvidenceAction failed", error)
     return { success: false, error: "Failed to request evidence." }
+  }
+}
+
+export async function extractVoiceComplaint(voiceTranscript: string): Promise<{
+  success: boolean
+  data?: { title: string; description: string; category: string }
+  error?: string
+}> {
+  try {
+    if (!voiceTranscript?.trim()) {
+      console.error("[Action:complaint] Voice transcript is empty");
+      return { success: false, error: "Voice transcript is empty." }
+    }
+
+    console.log("[Action:complaint] Extracting complaint from voice transcript:", {
+      length: voiceTranscript.length,
+      preview: voiceTranscript.substring(0, 100),
+    });
+
+    const result = await extractVoiceComplaintAi(voiceTranscript)
+
+    if (!result) {
+      console.error(
+        "[Action:complaint] extractVoiceComplaintAi returned null. Check NVIDIA API key and response format.",
+      );
+      return {
+        success: false,
+        error: "Failed to extract complaint details from voice. Please try again or check your microphone input.",
+      }
+    }
+
+    console.log("[Action:complaint] Successfully extracted complaint:", result);
+
+    return {
+      success: true,
+      data: {
+        title: result.title,
+        description: result.description,
+        category: result.category,
+      },
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("[Action:complaint] extractVoiceComplaint failed", {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return {
+      success: false,
+      error: "An error occurred while processing your voice complaint. Please try again.",
+    }
   }
 }
