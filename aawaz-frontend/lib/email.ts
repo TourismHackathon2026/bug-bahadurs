@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import { addEmailJob, isEmailQueueEnabled } from "@/lib/email-queue"
 
 const transport = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "localhost",
@@ -133,7 +134,7 @@ function renderEmailHtml(subject: string, text: string, bodyHtml?: string, compl
 </html>`
 }
 
-export async function sendEmail({
+async function sendEmailImmediate({
   to,
   subject,
   text,
@@ -163,3 +164,30 @@ export async function sendEmail({
     console.error("[Email] Failed to send email", err)
   }
 }
+
+export async function sendEmail({
+  to,
+  subject,
+  text,
+  html,
+  complaintLink,
+}: {
+  to: string
+  subject: string
+  text: string
+  html?: string
+  complaintLink?: string
+}): Promise<void> {
+  if (isEmailQueueEnabled()) {
+    try {
+      await addEmailJob({ to, subject, text, html, complaintLink })
+      return
+    } catch (err) {
+      console.error("[Email] Failed to enqueue email job, falling back to direct send", err)
+    }
+  }
+
+  await sendEmailImmediate({ to, subject, text, html, complaintLink })
+}
+
+export { sendEmailImmediate }
