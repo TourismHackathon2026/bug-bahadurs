@@ -57,6 +57,10 @@ export default async function AuthorityComplaintDetailPage({
     notFound();
   }
 
+  const isResolved =
+    complaint.status === ComplaintStatus.RESOLVED ||
+    complaint.status === ComplaintStatus.CLOSED;
+
   const reachedAt = complaint.statusEvents.reduce<
     Partial<Record<ComplaintStatusType, string>>
   >((acc, event) => {
@@ -86,10 +90,10 @@ export default async function AuthorityComplaintDetailPage({
   const selectedLocation =
     complaint.locationLat !== null && complaint.locationLng !== null
       ? {
-          lat: complaint.locationLat,
-          lng: complaint.locationLng,
-          label: complaint.locationLabel || "Reported location",
-        }
+        lat: complaint.locationLat,
+        lng: complaint.locationLng,
+        label: complaint.locationLabel || "Reported location",
+      }
       : undefined;
 
   return (
@@ -125,6 +129,18 @@ export default async function AuthorityComplaintDetailPage({
                 <PriorityBadge priority={complaint.priority} />
               </div>
             </div>
+
+            {isResolved ? (
+              <div className="mt-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+                <div className="flex items-center gap-2 font-semibold">
+                  <CheckCircle size={16} />
+                  Case resolved
+                </div>
+                <p className="mt-1 text-success/80">
+                  This complaint has been marked as resolved. The resolution controls below are disabled.
+                </p>
+              </div>
+            ) : null}
 
             <div className="mt-6 space-y-6">
               <div>
@@ -289,11 +305,12 @@ export default async function AuthorityComplaintDetailPage({
                 name="resolution"
                 rows={3}
                 placeholder="Resolution message..."
-                className="w-full rounded-md border border-input bg-surface px-3 py-2 text-sm focus:outline-none"
+                disabled={isResolved}
+                className="w-full rounded-md border border-input bg-surface px-3 py-2 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
-              <Button className="w-full" size="sm" type="submit">
+              <Button className="w-full" size="sm" type="submit" disabled={isResolved}>
                 <CheckCircle className="mr-1" size={16} />
-                Resolve Case
+                {isResolved ? "Case Resolved" : "Resolve Case"}
               </Button>
             </form>
           </div>

@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Plus } from "@phosphor-icons/react/dist/ssr"
+import { CreateAuthorityModal } from "@/components/admin/create-authority-modal"
+import { EditAuthorityModal } from "@/components/admin/edit-authority-modal"
 
 export const metadata: Metadata = {
   title: "Manage Authorities | Awaaz",
@@ -36,10 +37,7 @@ export default function ManageAuthoritiesPage() {
           </p>
         </div>
         <div>
-          <Button>
-            <Plus className="mr-1.5" size={16} weight="bold" />
-            Create Authority
-          </Button>
+          <CreateAuthorityModal />
         </div>
       </div>
 
@@ -65,9 +63,11 @@ export default function ManageAuthoritiesPage() {
                   </td>
                   <td className="px-6 py-4 text-center font-mono text-xs">{item.assignedCount}</td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm">
-                      Edit
-                    </Button>
+                    <EditAuthorityModal
+                      id={item.id}
+                      displayName={item.displayName}
+                      email={item.email}
+                    />
                   </td>
                 </tr>
               ))}

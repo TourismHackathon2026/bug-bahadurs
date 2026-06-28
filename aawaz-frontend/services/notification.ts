@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/email"
 import { sseEmitter } from "@/lib/sse-emitter"
 import { invalidateCache } from "@/lib/redis"
-import type { NotificationType } from "@/lib/constants"
+import { NotificationType, type NotificationType as NotificationTypeValue } from "@/lib/constants"
 
 export interface NotifyParams {
   userId: string
@@ -17,6 +17,33 @@ export interface NotifyParams {
   }
 }
 
+function getComplaintLink(type: NotificationTypeValue, complaintId?: string): string | undefined {
+  if (!complaintId) return undefined
+
+  const authorityDetailTypes = new Set<NotificationTypeValue>([
+    NotificationType.NEW_ASSIGNMENT,
+    NotificationType.EVIDENCE_UPLOADED,
+    NotificationType.ESCALATED,
+  ])
+
+  if (authorityDetailTypes.has(type)) {
+    return `/authority/complaints/${complaintId}`
+  }
+
+  const touristDetailTypes = new Set<NotificationTypeValue>([
+    NotificationType.COMPLAINT_SUBMITTED,
+    NotificationType.STATUS_CHANGED,
+    NotificationType.EVIDENCE_REQUESTED,
+    NotificationType.RESOLVED,
+  ])
+
+  if (touristDetailTypes.has(type)) {
+    return `/complaints/${complaintId}`
+  }
+
+  return undefined
+}
+
 async function dispatch(params: NotifyParams): Promise<void> {
   sseEmitter.emit(params.userId, "NEW_NOTIFICATION", {
     type: params.type,
@@ -26,10 +53,17 @@ async function dispatch(params: NotifyParams): Promise<void> {
   })
 
   if (params.email) {
+    const complaintLink = getComplaintLink(params.type, params.complaintId)
+    const text = complaintLink
+      ? `${params.email.text}\n\nView complaint details: ${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || ""
+      }${complaintLink}`
+      : params.email.text
+
     await sendEmail({
       to: params.email.to,
       subject: params.email.subject,
-      text: params.email.text,
+      text,
+      complaintLink,
     })
   }
 
