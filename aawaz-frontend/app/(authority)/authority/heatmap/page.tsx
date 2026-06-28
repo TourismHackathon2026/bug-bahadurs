@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { HeatmapView } from "@/components/map/heatmap-view"
+import { HeatmapViewLazy } from "@/components/map/heatmap-view-lazy"
 import { getHeatmapPoints } from "@/server/complaints"
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default async function HeatmapPage() {
       </div>
 
       <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm p-4">
-        <HeatmapView points={heatmapPoints} />
+        <HeatmapViewLazy points={heatmapPoints} />
       </div>
     </div>
   )

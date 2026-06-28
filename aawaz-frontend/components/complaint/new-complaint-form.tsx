@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,8 +16,16 @@ import {
   FileText,
   Video,
   UploadSimple,
+  MagnifyingGlass,
+  Spinner,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+
+interface GeocodeResult {
+  lat: string;
+  lon: string;
+  display_name: string;
+}
 
 type SelectedEvidenceFile = {
   file: File;
@@ -46,6 +54,12 @@ export function NewComplaintForm() {
   const [lng, setLng] = useState<number | null>(null);
   const [label, setLabel] = useState("");
 
+  // Address search state
+  const [addressInput, setAddressInput] = useState("");
+  const [geocodeResults, setGeocodeResults] = useState<GeocodeResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
   const [selectedFiles, setSelectedFiles] = useState<SelectedEvidenceFile[]>(
     [],
   );
@@ -53,6 +67,70 @@ export function NewComplaintForm() {
 
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Debounced address search using Nominatim API
+  const handleAddressSearch = useCallback(
+    (query: string) => {
+      setAddressInput(query);
+      setGeocodeResults([]);
+
+      if (!query.trim()) {
+        if (debounceTimer.current) {
+          clearTimeout(debounceTimer.current);
+          debounceTimer.current = null;
+        }
+        setIsSearching(false);
+        return;
+      }
+
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+
+      debounceTimer.current = setTimeout(async () => {
+        setIsSearching(true);
+        try {
+          const params = new URLSearchParams({
+            q: query,
+            format: "json",
+            limit: "5",
+            countrycodes: "np", // Bias results toward Nepal
+          });
+
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?${params}`,
+            {
+              headers: {
+                "User-Agent": "awaaz-app", // Nominatim requires user-agent
+              },
+            }
+          );
+
+          if (!response.ok) throw new Error("Failed to search address");
+
+          const results: GeocodeResult[] = await response.json();
+          setGeocodeResults(results);
+        } catch (err) {
+          console.error("[NewComplaintForm] Address search failed:", err);
+          setGeocodeResults([]);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 500); // 500ms debounce
+    },
+    []
+  );
+
+  // Handle selecting an address from search results
+  const handleSelectAddress = (result: GeocodeResult) => {
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    setLat(lat);
+    setLng(lon);
+    setLabel(result.display_name);
+    setAddressInput("");
+    setGeocodeResults([]);
+  };
 
   const handleFileSelection = (files: FileList | null) => {
     if (!files) return;
@@ -286,12 +364,58 @@ export function NewComplaintForm() {
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Incident Location (Map Pin)
             </label>
+
+            {/* Address Search Input */}
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                {isSearching ? (
+                  <Spinner size={18} weight="fill" className="animate-spin" />
+                ) : (
+                  <MagnifyingGlass size={18} />
+                )}
+              </div>
+              <Input
+                type="text"
+                placeholder="Search address (e.g., Thamel, Kathmandu)..."
+                value={addressInput}
+                onChange={(e) => handleAddressSearch(e.target.value)}
+                disabled={isPending || isSearching}
+                className="bg-white pl-10"
+              />
+            </div>
+
+            {/* Geocode Results Dropdown */}
+            {geocodeResults.length > 0 && (
+              <div className="absolute z-50 w-full max-w-md rounded-md border border-border bg-white shadow-lg">
+                {geocodeResults.map((result, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectAddress(result)}
+                    className="w-full border-b border-border px-4 py-3 text-left text-sm hover:bg-surface transition-colors last:border-b-0"
+                  >
+                    <p className="font-medium text-foreground truncate">
+                      {result.display_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {result.lat}, {result.lon}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <MapPinPicker
               onLocationSelect={(loc) => {
                 setLat(loc.lat);
                 setLng(loc.lng);
                 setLabel(loc.label || "");
               }}
+              selectedLocation={
+                lat !== null && lng !== null
+                  ? { lat, lng, label }
+                  : undefined
+              }
               disabled={isPending}
             />
             {label && (
