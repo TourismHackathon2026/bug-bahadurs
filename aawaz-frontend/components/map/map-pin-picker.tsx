@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { Crosshair, MapPin } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,13 +42,26 @@ function MapClickHandler({
   return null;
 }
 
+function MapCenterController({
+  center,
+}: {
+  center: { lat: number; lng: number };
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView([center.lat, center.lng], map.getZoom(), { animate: true });
+  }, [center.lat, center.lng, map]);
+
+  return null;
+}
+
 export function MapPinPicker({
   onLocationSelect,
   defaultCenter = DEFAULT_CENTER,
   selectedLocation,
   disabled = false,
 }: MapPinPickerProps) {
-  const [mapCenter, setMapCenter] = useState(selectedLocation ?? defaultCenter);
   const [selectedPosition, setSelectedPosition] = useState<
     Location | undefined
   >(selectedLocation);
@@ -65,6 +78,10 @@ export function MapPinPicker({
   const onLocationSelectRef = useRef(onLocationSelect);
 
   const displayPosition = selectedLocation ?? selectedPosition;
+  const mapCenter = displayPosition ?? defaultCenter;
+  const visibleStatusMessage = selectedLocation
+    ? "Showing selected incident location."
+    : statusMessage;
 
   const markerIcon = useMemo(() => {
     return L.icon({
@@ -82,56 +99,6 @@ export function MapPinPicker({
   useEffect(() => {
     onLocationSelectRef.current = onLocationSelect;
   });
-
-  useEffect(() => {
-    if (!selectedLocation) return;
-    setMapCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng });
-    setStatusMessage("Showing selected incident location.");
-  }, [selectedLocation]);
-
-  useEffect(() => {
-    if (disabled || selectedLocation) return;
-
-    if (!navigator.geolocation) {
-      console.log(
-        "[MapPinPicker] Geolocation is not supported by this browser.",
-      );
-      setStatusMessage(
-        "Geolocation unavailable. Tap the map to select a location.",
-      );
-      return;
-    }
-
-    setAttemptingLocation(true);
-    console.log("[MapPinPicker] requesting current position");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          label: "Current location",
-        };
-        console.log("[MapPinPicker] current location obtained:", location);
-        console.log("accuracy (meters):", position.coords.accuracy);
-        setMapCenter({ lat: location.lat, lng: location.lng });
-        setSelectedPosition(location);
-        setStatusMessage(
-          "Current location detected. Tap map to choose a different point.",
-        );
-        onLocationSelectRef.current?.(location);
-        setAttemptingLocation(false);
-      },
-      (error) => {
-        console.warn("[MapPinPicker] geolocation failed:", error);
-        setStatusMessage(
-          error?.message ||
-            "Unable to get current location. Tap the map to choose a location.",
-        );
-        setAttemptingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  }, [disabled, selectedLocation]);
 
   const handleLocateMe = () => {
     if (!navigator.geolocation) {
@@ -154,7 +121,6 @@ export function MapPinPicker({
           label: "Current location",
         };
         console.log("[MapPinPicker] locate me success:", location);
-        setMapCenter({ lat: location.lat, lng: location.lng });
         setSelectedPosition(location);
         setStatusMessage(
           "Current location detected. Tap map to choose a different point.",
@@ -166,7 +132,7 @@ export function MapPinPicker({
         console.warn("[MapPinPicker] locate me failed:", error);
         setStatusMessage(
           error?.message ||
-            "Unable to get current location. Tap the map to choose a location.",
+          "Unable to get current location. Tap the map to choose a location.",
         );
         setAttemptingLocation(false);
       },
@@ -176,7 +142,6 @@ export function MapPinPicker({
 
   const handleMapSelection = (location: Location) => {
     setSelectedPosition(location);
-    setMapCenter({ lat: location.lat, lng: location.lng });
     onLocationSelect?.(location);
   };
 
@@ -190,7 +155,7 @@ export function MapPinPicker({
           <div>
             {disabled ? "Reported incident location" : "Incident location map"}
           </div>
-          <p className="text-xs text-muted-foreground">{statusMessage}</p>
+          <p className="text-xs text-muted-foreground">{visibleStatusMessage}</p>
         </div>
       </div>
 
@@ -243,6 +208,7 @@ export function MapPinPicker({
                   },
                 }}
               />
+              <MapCenterController center={mapCenter} />
               {displayPosition ? (
                 <Marker
                   position={[displayPosition.lat, displayPosition.lng]}

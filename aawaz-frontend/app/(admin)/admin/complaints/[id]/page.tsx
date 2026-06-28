@@ -20,7 +20,6 @@ import {
 import Link from "next/link"
 import {
   COMPLAINT_CATEGORY_LABELS,
-  COMPLAINT_STATUS_LABELS,
   AUTHORITY_TYPE_LABELS,
 } from "@/lib/constants"
 
@@ -88,7 +87,7 @@ export default async function AdminComplaintDetailPage({ params }: Props) {
               </Badge>
               {complaint.aiCategory && (
                 <Badge variant="secondary">
-                  AI: {COMPLAINT_CATEGORY_LABELS[complaint.aiCategory] ?? complaint.aiCategory}
+                  AI: {complaint.aiCategory}
                   {complaint.aiConfidence != null && ` (${Math.round(complaint.aiConfidence * 100)}%)`}
                 </Badge>
               )}

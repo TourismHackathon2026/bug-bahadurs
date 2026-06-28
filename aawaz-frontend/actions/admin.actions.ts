@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { AuthorityType, Role } from "@/lib/constants"
+import { AuthorityType, ComplaintStatus, Role } from "@/lib/constants"
 import { hashPassword } from "@/lib/password"
 import { prisma } from "@/lib/prisma"
+import { getSession } from "@/lib/session"
 import { approveTouristRegistration, rejectTouristRegistration } from "@/server/admin"
+import { updateComplaintStatus as repoUpdateComplaintStatus } from "@/server/complaints"
 
 /**
  * Server action to approve tourist registration
@@ -182,6 +184,36 @@ export async function updateAuthority(
   } catch (error) {
     console.error("[Action:admin] updateAuthority failed", error)
     return { success: false, error: "Failed to update authority account." }
+  }
+}
+
+/**
+ * Server action to escalate a complaint to investigation.
+ */
+export async function escalateComplaintAction(
+  complaintId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await getSession()
+    if (!session || session.role !== "ADMIN") {
+      return { success: false, error: "Unauthorized." }
+    }
+
+    await repoUpdateComplaintStatus(
+      complaintId,
+      ComplaintStatus.INVESTIGATION,
+      session.userId,
+      "Escalated by admin",
+    )
+
+    revalidatePath("/admin/complaints")
+    revalidatePath(`/admin/complaints/${complaintId}`)
+    revalidatePath("/authority/complaints")
+
+    return { success: true }
+  } catch (error) {
+    console.error("[Action:admin] escalateComplaintAction failed", error)
+    return { success: false, error: "Failed to escalate complaint." }
   }
 }
 

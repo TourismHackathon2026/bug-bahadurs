@@ -26,7 +26,7 @@ export interface Complaint {
       authorityType: string;
     };
   } | null;
-  aiCategory: ComplaintCategory | null;
+  aiCategory: string | null;
   aiConfidence: number | null;
   descOriginal: string | null;
   detectedLang: string | null;

@@ -2,13 +2,15 @@
 
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
-import { ComplaintStatus, ComplaintCategory } from "@/lib/constants"
+import { ComplaintStatus, ComplaintCategory, Priority, NotificationType } from "@/lib/constants"
 import { getSession } from "@/lib/session"
+import { prisma } from "@/lib/prisma"
 import {
   createComplaint as repoCreateComplaint,
   updateComplaintStatus as repoUpdateComplaintStatus,
 } from "@/server/complaints"
 import { categorizeComplaint } from "@/server/ai"
+import { notifyInTx } from "@/services/notification"
 
 const complaintSchema = z.object({
   title: z.string().trim().min(5, "Title must be at least 5 characters").max(150, "Title must be at most 150 characters"),
@@ -133,4 +135,99 @@ export async function resolveComplaint(
   summary: string
 ): Promise<{ success: boolean; error?: string }> {
   return updateComplaintStatus(id, ComplaintStatus.RESOLVED, summary || "Complaint resolved")
+}
+
+/**
+ * Server action to manually override complaint categorization.
+ */
+export async function overrideCategorizationAction(
+  complaintId: string,
+  category: ComplaintCategory,
+  priority: Priority,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await getSession()
+    if (!session || (session.role !== "AUTHORITY" && session.role !== "ADMIN")) {
+      return { success: false, error: "Unauthorized." }
+    }
+
+    await prisma.complaint.update({
+      where: { id: complaintId },
+      data: {
+        category,
+        priority,
+        aiCategory: category,
+        aiConfidence: 100,
+      },
+    })
+
+    revalidatePath("/authority/complaints")
+    revalidatePath(`/authority/complaints/${complaintId}`)
+    revalidatePath(`/dashboard/complaints/${complaintId}`)
+    revalidatePath("/admin/complaints")
+    revalidatePath(`/admin/complaints/${complaintId}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("[Action:complaint] overrideCategorizationAction failed", error)
+    return { success: false, error: "Failed to override categorization." }
+  }
+}
+
+/**
+ * Server action to request evidence from the complainant.
+ */
+export async function requestEvidenceAction(
+  complaintId: string,
+  message: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await getSession()
+    if (!session || (session.role !== "AUTHORITY" && session.role !== "ADMIN")) {
+      return { success: false, error: "Unauthorized." }
+    }
+
+    const complaint = await prisma.complaint.findUnique({
+      where: { id: complaintId },
+      select: {
+        id: true,
+        referenceNo: true,
+        touristId: true,
+        tourist: {
+          select: { email: true, displayName: true },
+        },
+      },
+    })
+
+    if (!complaint) {
+      return { success: false, error: "Complaint not found." }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await notifyInTx(tx, {
+        userId: complaint.touristId,
+        complaintId,
+        type: NotificationType.EVIDENCE_REQUESTED,
+        title: "Evidence requested",
+        body: message,
+        email: complaint.tourist?.email
+          ? {
+            to: complaint.tourist.email,
+            subject: `Evidence requested for ${complaint.referenceNo}`,
+            text: `Dear ${complaint.tourist.displayName ?? "User"},\n\nEvidence has been requested for your complaint ${complaint.referenceNo}.\n\n${message}`,
+          }
+          : undefined,
+      })
+    })
+
+    revalidatePath("/authority/complaints")
+    revalidatePath(`/authority/complaints/${complaintId}`)
+    revalidatePath(`/dashboard/complaints/${complaintId}`)
+    revalidatePath("/dashboard")
+
+    return { success: true }
+  } catch (error) {
+    console.error("[Action:complaint] requestEvidenceAction failed", error)
+    return { success: false, error: "Failed to request evidence." }
+  }
 }

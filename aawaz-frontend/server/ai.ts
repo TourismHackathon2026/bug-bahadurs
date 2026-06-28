@@ -1,7 +1,5 @@
-import { ComplaintCategory, Priority } from "@/lib/constants";
+import { Priority } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
-import { routeComplaint } from "@/server/routing";
-import { notifyInTx } from "@/services/notification";
 
 const NVIDIA_API_URL =
   process.env.NVIDIA_API_URL ??
@@ -11,12 +9,11 @@ const NVIDIA_MODEL =
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 
 interface AiCategorizationResult {
-  category: ComplaintCategory;
+  category: string;
   priority: Priority;
   confidence: number;
 }
 
-const validCategories = Object.values(ComplaintCategory);
 const validPriorities = Object.values(Priority);
 
 function redactPII(text: string): string {
@@ -46,24 +43,19 @@ function parseResponseContent(content: unknown): AiCategorizationResult | null {
 
   try {
     const parsed = JSON.parse(jsonMatch[0]);
-    const rawCategory =
-      typeof parsed.category === "string"
-        ? parsed.category.toUpperCase().trim()
-        : "";
+    const category =
+      typeof parsed.category === "string" ? parsed.category.trim() : "";
     const rawPriority =
       typeof parsed.priority === "string"
         ? parsed.priority.toUpperCase().trim()
         : "";
-    const category = validCategories.includes(rawCategory as ComplaintCategory)
-      ? (rawCategory as ComplaintCategory)
-      : null;
     const priority = validPriorities.includes(rawPriority as Priority)
       ? (rawPriority as Priority)
       : "NORMAL";
     const confidence = normalizeConfidence(
       parsed.confidence ??
-        parsed.confidenceScore ??
-        parsed.confidence_percentage,
+      parsed.confidenceScore ??
+      parsed.confidence_percentage,
     );
 
     if (!category) return null;
@@ -83,19 +75,31 @@ function parseResponseContent(content: unknown): AiCategorizationResult | null {
   }
 }
 
-function getTextFromAiResponse(responseJson: any): string | null {
-  const choice = responseJson?.choices?.[0];
+function getTextFromAiResponse(responseJson: unknown): string | null {
+  const choices =
+    typeof responseJson === "object" && responseJson !== null
+      ? (responseJson as { choices?: unknown[] }).choices
+      : undefined;
+  const choice = choices?.[0] as {
+    message?: { content?: unknown };
+    text?: unknown;
+    delta?: { content?: unknown };
+  } | undefined;
   if (!choice) return null;
 
   if (typeof choice.message?.content === "string") {
     return choice.message.content;
   }
 
+  const content = choice.message?.content;
   if (
-    Array.isArray(choice.message?.content?.parts) &&
-    choice.message.content.parts.length > 0
+    content &&
+    typeof content === "object" &&
+    "parts" in content &&
+    Array.isArray((content as { parts: unknown[] }).parts) &&
+    (content as { parts: unknown[] }).parts.length > 0
   ) {
-    return choice.message.content.parts.join(" ");
+    return (content as { parts: unknown[] }).parts.join(" ");
   }
 
   if (typeof choice.text === "string") {
@@ -110,7 +114,7 @@ function getTextFromAiResponse(responseJson: any): string | null {
 }
 
 function buildPrompt(description: string): string {
-  return `You are a complaint triage assistant for a civic tourism platform in Nepal. Analyze the complaint description and return only a JSON object with the following keys:\n- category: one of TAXI_FRAUD, HOTEL_ISSUE, TREKKING_SAFETY, OVERCHARGING, HARASSMENT, THEFT, OTHER\n- priority: one of LOW, NORMAL, HIGH, URGENT\n- confidence: a number representing classification confidence from 0 to 100\n\nDo not add any explanatory text or markdown. If the complaint matches multiple categories, choose the single best category. If unsure, choose OTHER.\n\nComplaint:\n${description}`;
+  return `You are a complaint triage assistant for a civic tourism platform in Nepal. Analyze the complaint description and return only a JSON object with the following keys:\n- category: a short free-form text label that best describes the complaint in plain language\n- priority: one of LOW, NORMAL, HIGH, URGENT\n- confidence: a number representing classification confidence from 0 to 100\n\nDo not use a fixed category list. The category can be any concise descriptive phrase, such as "Taxi overcharging", "Hotel cleanliness issue", or "Harassment complaint". Do not add any explanatory text or markdown.\n\nComplaint:\n${description}`;
 }
 
 export async function categorizeComplaint(
@@ -199,11 +203,8 @@ export async function categorizeComplaint(
     select: {
       id: true,
       referenceNo: true,
-      category: true,
       priority: true,
-      status: true,
       touristId: true,
-      assignedToId: true,
     },
   });
 
@@ -212,44 +213,6 @@ export async function categorizeComplaint(
       `[Service:AI] Complaint ${id} not found while updating AI categorization`,
     );
     return null;
-  }
-
-  const tourist = await prisma.user.findUnique({
-    where: { id: complaint.touristId },
-    select: { email: true, displayName: true },
-  });
-
-  const aiAuthorityType = routeComplaint(aiResult.category);
-
-  const currentAssignedOfficer = complaint.assignedToId
-    ? await prisma.user.findUnique({
-        where: { id: complaint.assignedToId },
-        select: { authorityProfile: { select: { authorityType: true } } },
-      })
-    : null;
-
-  const currentAuthorityType =
-    currentAssignedOfficer?.authorityProfile?.authorityType;
-  let assignedOfficerId = complaint.assignedToId;
-
-  let newOfficerEmail: string | undefined
-  let newOfficerName: string | undefined
-  if (!assignedOfficerId || currentAuthorityType !== aiAuthorityType) {
-    const targetOfficer = await prisma.user.findFirst({
-      where: {
-        role: "AUTHORITY",
-        authorityProfile: {
-          authorityType: aiAuthorityType,
-        },
-      },
-      select: { id: true, email: true, displayName: true },
-    });
-
-    if (targetOfficer) {
-      assignedOfficerId = targetOfficer.id;
-      newOfficerEmail = targetOfficer.email;
-      newOfficerName = targetOfficer.displayName;
-    }
   }
 
   const updateData: Record<string, unknown> = {
@@ -270,50 +233,11 @@ export async function categorizeComplaint(
     updateData.priority = aiResult.priority;
   }
 
-  if (assignedOfficerId && assignedOfficerId !== complaint.assignedToId) {
-    updateData.assignedToId = assignedOfficerId;
-    if (complaint.status === "SUBMITTED") {
-      updateData.status = "ASSIGNED";
-    }
-  }
-
   await prisma.$transaction(async (tx) => {
     await tx.complaint.update({
       where: { id },
       data: updateData,
     });
-
-    await notifyInTx(tx, {
-      userId: complaint.touristId,
-      complaintId: id,
-      type: "STATUS_CHANGED",
-      title: "AI categorization completed",
-      body: `Your complaint ${complaint.referenceNo} was categorized by AI as ${aiResult.category.replaceAll("_", " ")}.`,
-      email: tourist?.email
-        ? {
-            to: tourist.email,
-            subject: "Complaint Categorized by AI",
-            text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${complaint.referenceNo} has been analyzed by our AI system and categorized as ${aiResult.category.replaceAll("_", " ")}.\n\nYou can check the details in your dashboard.`,
-          }
-        : undefined,
-    });
-
-    if (assignedOfficerId && assignedOfficerId !== complaint.assignedToId) {
-      await notifyInTx(tx, {
-        userId: assignedOfficerId,
-        complaintId: id,
-        type: "NEW_ASSIGNMENT",
-        title: "Complaint reassigned by AI",
-        body: `A complaint was routed to your authority based on AI triage.`,
-        email: newOfficerEmail
-          ? {
-              to: newOfficerEmail,
-              subject: "Complaint Assigned by AI Triage",
-              text: `Dear ${newOfficerName ?? "Officer"},\n\nA complaint has been routed to your department by our AI triage system.\n\nPlease review it in your dashboard.`,
-            }
-          : undefined,
-      });
-    }
   });
 
   console.log(

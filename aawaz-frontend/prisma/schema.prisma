@@ -44,27 +44,27 @@ model AuthorityProfile {
 }
 
 model Complaint {
-  id            String             @id @default(uuid())
-  referenceNo   String             @unique // e.g. AWAAZ-2026-00231
+  id            String            @id @default(uuid())
+  referenceNo   String            @unique // e.g. AWAAZ-2026-00231
   title         String
   description   String
   category      ComplaintCategory
-  status        ComplaintStatus    @default(SUBMITTED)
-  priority      Priority           @default(NORMAL)
+  status        ComplaintStatus   @default(SUBMITTED)
+  priority      Priority          @default(NORMAL)
   incidentDate  DateTime
   locationLat   Float?
   locationLng   Float?
   locationLabel String?
   touristId     String
-  tourist       User               @relation("TouristComplaints", fields: [touristId], references: [id])
+  tourist       User              @relation("TouristComplaints", fields: [touristId], references: [id])
   assignedToId  String?
-  assignedTo    User?              @relation("AssignedComplaints", fields: [assignedToId], references: [id])
-  aiCategory    ComplaintCategory?
+  assignedTo    User?             @relation("AssignedComplaints", fields: [assignedToId], references: [id])
+  aiCategory    String?
   aiConfidence  Float?
   descOriginal  String? // if translated
   detectedLang  String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   evidence      Evidence[]
   statusEvents  StatusEvent[]
