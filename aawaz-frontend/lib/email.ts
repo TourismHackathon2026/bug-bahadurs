@@ -12,11 +12,20 @@ const transport = nodemailer.createTransport({
 
 const APP_NAME = "Awaaz"
 const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL?.trim()
-const EMAIL_BRAND_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || ""
+const APP_ORIGIN =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+  process.env.APP_URL?.replace(/\/$/, "") ||
+  "http://localhost:3000"
+
+const EMAIL_BRAND_URL = APP_ORIGIN
 
 function buildAbsoluteUrl(path: string): string {
-  if (!EMAIL_BRAND_URL) return path
+  if (!APP_ORIGIN) return path
   return path.startsWith("/") ? `${EMAIL_BRAND_URL}${path}` : `${EMAIL_BRAND_URL}/${path}`
+}
+
+export function getAppOrigin(): string {
+  return APP_ORIGIN
 }
 
 function escapeHtml(value: string): string {
@@ -97,8 +106,7 @@ function renderEmailHtml(subject: string, text: string, bodyHtml?: string, compl
                         ${safeComplaintLink ? `<div style="margin:0 0 18px;padding:16px;border:1px solid #d9e2df;border-radius:18px;background:#f8faf9;">` : ""}
                         ${safeComplaintLink ? `<div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5a6f77;margin-bottom:8px;">Complaint reference</div>` : ""}
                         ${safeComplaintLink ? `<a href="${escapeHtml(safeComplaintLink)}" style="display:inline-block;font-size:15px;font-weight:700;color:#0f766e;text-decoration:none;word-break:break-all;">${escapeHtml(safeComplaintLink.replace(/^.*\//, ""))}</a>` : ""}
-                        ${safeComplaintLink ? `<div style="margin-top:10px;"><a href="${escapeHtml(safeComplaintLink)}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;">View complaint details</a></div></div>` : ""}
-                        ${safeBody}
+                       
                       </div>
                     </td>
                   </tr>

@@ -151,10 +151,10 @@ export async function createComplaint(data: {
       body: `Your complaint ${referenceNo} has been submitted and is routed to ${routedAuthorityType.replace("_", " ")}.`,
       email: tourist?.email
         ? {
-            to: tourist.email,
-            subject: "Complaint Submitted Successfully",
-            text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${referenceNo} has been submitted successfully and is routed to ${routedAuthorityType.replace("_", " ")}.\n\nYou will be notified when there are updates.`,
-          }
+          to: tourist.email,
+          subject: "Complaint Submitted Successfully",
+          text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${referenceNo} has been submitted successfully and is routed to ${routedAuthorityType.replace("_", " ")}.\n\nYou will be notified when there are updates.`,
+        }
         : undefined,
     });
 
@@ -448,10 +448,10 @@ export async function updateComplaintStatus(
       body: `Your complaint ${complaint.referenceNo} is now ${status.replaceAll("_", " ").toLowerCase()}.`,
       email: tourist?.email
         ? {
-            to: tourist.email,
-            subject: status === "RESOLVED" ? "Complaint Resolved" : "Complaint Status Updated",
-            text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${complaint.referenceNo} has been updated to ${status.replaceAll("_", " ").toLowerCase()}.\n\nYou can check the details in your dashboard.`,
-          }
+          to: tourist.email,
+          subject: status === "RESOLVED" ? "Complaint Resolved" : "Complaint Status Updated",
+          text: `Dear ${tourist?.displayName ?? "User"},\n\nYour complaint ${complaint.referenceNo} has been updated to ${status.replaceAll("_", " ").toLowerCase()}.\n\nYou can check the details in your dashboard.`,
+        }
         : undefined,
     });
 
@@ -466,9 +466,59 @@ export async function getHeatmapPoints(filters: {
   startDate?: Date;
   endDate?: Date;
 }): Promise<HeatmapPoint[]> {
-  console.log(
-    "[Repository:complaints] getHeatmapPoints - not implemented",
-    filters,
-  );
-  return [];
+  const where: Record<string, unknown> = {
+    locationLat: { not: null },
+    locationLng: { not: null },
+  };
+
+  if (filters.category?.length) {
+    where.category = { in: filters.category };
+  }
+
+  if (filters.startDate || filters.endDate) {
+    where.incidentDate = {
+      ...(filters.startDate ? { gte: filters.startDate } : {}),
+      ...(filters.endDate ? { lte: filters.endDate } : {}),
+    };
+  }
+
+  const complaints = await prisma.complaint.findMany({
+    where,
+    select: {
+      locationLat: true,
+      locationLng: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (complaints.length === 0) {
+    return [];
+  }
+
+  const grouped = new Map<string, { lat: number; lng: number; count: number }>();
+
+  for (const complaint of complaints) {
+    if (complaint.locationLat === null || complaint.locationLng === null) {
+      continue;
+    }
+
+    const lat = Number(complaint.locationLat.toFixed(3));
+    const lng = Number(complaint.locationLng.toFixed(3));
+    const key = `${lat}:${lng}`;
+    const existing = grouped.get(key);
+
+    if (existing) {
+      existing.count += 1;
+    } else {
+      grouped.set(key, { lat, lng, count: 1 });
+    }
+  }
+
+  const maxCount = Math.max(...Array.from(grouped.values()).map((point) => point.count));
+
+  return Array.from(grouped.values()).map((point) => ({
+    lat: point.lat,
+    lng: point.lng,
+    intensity: Number((point.count / maxCount).toFixed(3)),
+  }));
 }

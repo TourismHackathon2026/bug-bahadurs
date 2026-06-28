@@ -1,5 +1,6 @@
+import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { sendEmail } from "@/lib/email"
+import { getAppOrigin, sendEmail } from "@/lib/email"
 import { sseEmitter } from "@/lib/sse-emitter"
 import { invalidateCache } from "@/lib/redis"
 import { NotificationType, type NotificationType as NotificationTypeValue } from "@/lib/constants"
@@ -55,8 +56,7 @@ async function dispatch(params: NotifyParams): Promise<void> {
   if (params.email) {
     const complaintLink = getComplaintLink(params.type, params.complaintId)
     const text = complaintLink
-      ? `${params.email.text}\n\nView complaint details: ${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || ""
-      }${complaintLink}`
+      ? `${params.email.text}\n\nView complaint details: ${getAppOrigin()}${complaintLink}`
       : params.email.text
 
     await sendEmail({
@@ -75,7 +75,7 @@ async function dispatch(params: NotifyParams): Promise<void> {
  * Call from inside `prisma.$transaction(async (tx) => { ... })`.
  */
 export async function notifyInTx(
-  tx: any,
+  tx: Prisma.TransactionClient,
   params: NotifyParams,
 ): Promise<void> {
   await tx.notification.create({

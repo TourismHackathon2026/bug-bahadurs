@@ -1,17 +1,14 @@
 import type { Metadata } from "next"
 import { HeatmapView } from "@/components/map/heatmap-view"
+import { getHeatmapPoints } from "@/server/complaints"
 
 export const metadata: Metadata = {
   title: "Complaint Heatmap | Awaaz",
   description: "Heatmap visualization of civic complaints across Nepal.",
 }
 
-export default function HeatmapPage() {
-  const mockHeatmapPoints = [
-    { lat: 27.7172, lng: 85.324, intensity: 0.8 }, // Kathmandu Thamel
-    { lat: 28.2096, lng: 83.9856, intensity: 0.5 }, // Pokhara Lakeside
-    { lat: 27.671, lng: 85.4298, intensity: 0.3 }, // Bhaktapur
-  ]
+export default async function HeatmapPage() {
+  const heatmapPoints = await getHeatmapPoints({})
 
   return (
     <div className="space-y-6">
@@ -23,7 +20,7 @@ export default function HeatmapPage() {
       </div>
 
       <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm p-4">
-        <HeatmapView points={mockHeatmapPoints} />
+        <HeatmapView points={heatmapPoints} />
       </div>
     </div>
   )
