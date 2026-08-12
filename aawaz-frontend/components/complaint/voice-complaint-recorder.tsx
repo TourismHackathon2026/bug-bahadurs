@@ -31,6 +31,7 @@ export function VoiceComplaintRecorder({
     const {
         transcript,
         isListening,
+        isStarting,
         error,
         startListening,
         stopListening,
@@ -118,7 +119,7 @@ export function VoiceComplaintRecorder({
                 {!isListening ? (
                     <Button type="button"
                         onClick={handleStartRecording}
-                        disabled={disabled || isExtracting}
+                        disabled={disabled || isExtracting || isStarting}
                         className="flex items-center gap-2 bg-primary hover:bg-primary/90"
                     >
                         <Microphone size={18} weight="fill" />
@@ -146,7 +147,13 @@ export function VoiceComplaintRecorder({
             </div>
 
             {/* Status Indicator */}
-            {isListening && (
+            {isStarting && (
+                <div className="flex items-center gap-2 text-sm text-primary font-medium">
+                    <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    Voice is starting... Please wait before speaking.
+                </div>
+            )}
+            {isListening && !isStarting && (
                 <div className="flex items-center gap-2 text-sm text-primary font-medium">
                     <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
                     Listening...

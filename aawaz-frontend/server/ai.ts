@@ -39,40 +39,46 @@ function parseResponseContent(content: unknown): AiCategorizationResult | null {
 
   const raw = content.trim();
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const category =
+        typeof parsed.category === "string" ? parsed.category.trim() : "";
+      const rawPriority =
+        typeof parsed.priority === "string"
+          ? parsed.priority.toUpperCase().trim()
+          : "";
+      const priority = validPriorities.includes(rawPriority as Priority)
+        ? (rawPriority as Priority)
+        : "NORMAL";
+      const confidence = normalizeConfidence(
+        parsed.confidence ??
+        parsed.confidenceScore ??
+        parsed.confidence_percentage,
+      );
 
-  try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    const category =
-      typeof parsed.category === "string" ? parsed.category.trim() : "";
-    const rawPriority =
-      typeof parsed.priority === "string"
-        ? parsed.priority.toUpperCase().trim()
-        : "";
-    const priority = validPriorities.includes(rawPriority as Priority)
-      ? (rawPriority as Priority)
-      : "NORMAL";
-    const confidence = normalizeConfidence(
-      parsed.confidence ??
-      parsed.confidenceScore ??
-      parsed.confidence_percentage,
-    );
+      if (!category) return null;
 
-    if (!category) return null;
-
-    return {
-      category,
-      priority,
-      confidence: Math.min(Math.max(confidence, 0), 100),
-    };
-  } catch (error) {
-    console.error(
-      "[Service:AI] Failed to parse AI response JSON",
-      error,
-      content,
-    );
-    return null;
+      return {
+        category,
+        priority,
+        confidence: Math.min(Math.max(confidence, 0), 100),
+      };
+    } catch (error) {
+      console.error(
+        "[Service:AI] Failed to parse AI response JSON",
+        error,
+        content,
+      );
+    }
   }
+
+  if (!raw) return null;
+  return {
+    category: raw,
+    priority: "NORMAL",
+    confidence: 0,
+  };
 }
 
 function getTextFromAiResponse(responseJson: unknown): string | null {
@@ -190,6 +196,7 @@ export async function categorizeComplaint(
   }
 
   const aiResult = parseResponseContent(content);
+  console.log(aiResult)
   if (!aiResult) {
     console.error(
       "[Service:AI] Could not extract AI categorization from response",
@@ -215,7 +222,11 @@ export async function categorizeComplaint(
     return null;
   }
 
-  const updateData: Record<string, unknown> = {
+  const updateData: {
+    aiCategory: string
+    aiConfidence: number
+    priority?: Priority
+  } = {
     aiCategory: aiResult.category,
     aiConfidence: aiResult.confidence,
   };
@@ -257,9 +268,10 @@ interface VoiceComplaintFields {
 
 function buildVoiceExtractionPrompt(voiceTranscript: string): string {
   return `You are a complaint processing assistant for a civic tourism platform in Nepal.
-A tourist has reported an incident via voice. Your task is to extract and structure their complaint into a JSON format.
+A tourist has reported an incident via voice. Your only task is to extract and structure the complaint into JSON.
 
-IMPORTANT: Return ONLY a valid JSON object with NO additional text, markdown, or explanations.
+IMPORTANT: Respond in English only. Do not roleplay, do not answer as a different assistant, and do not include any content aside from the JSON.
+Return EXACTLY one valid JSON object with no additional text, markdown, or explanation.
 
 The JSON must have these exact keys:
 {

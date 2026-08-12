@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 interface UseSpeechToTextReturn {
     transcript: string;
     isListening: boolean;
+    isStarting: boolean;
     isSpeaking: boolean;
     error: string | null;
     startListening: (language?: string) => void;
@@ -15,7 +16,9 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     const [transcript, setTranscript] = useState("");
     const [interimTranscript, setInterimTranscript] = useState("");
     const [isListening, setIsListening] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const recognitionRef = useRef<any>(null);
 
     // Check if browser supports Web Speech API
     const SpeechRecognition =
@@ -37,6 +40,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
                 setError(null);
                 setTranscript("");
                 setInterimTranscript("");
+                setIsStarting(true);
 
                 const recognition = new SpeechRecognition();
                 recognition.continuous = false;
@@ -44,6 +48,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
                 recognition.lang = language;
 
                 recognition.onstart = () => {
+                    setIsStarting(false);
                     setIsListening(true);
                 };
 
@@ -78,12 +83,17 @@ export function useSpeechToText(): UseSpeechToTextReturn {
 
                     setError(errorMessage);
                     setIsListening(false);
+                    setIsStarting(false);
+                    recognitionRef.current = null;
                 };
 
                 recognition.onend = () => {
                     setIsListening(false);
+                    setIsStarting(false);
+                    recognitionRef.current = null;
                 };
 
+                recognitionRef.current = recognition;
                 recognition.start();
             } catch (err) {
                 const message =
@@ -96,16 +106,17 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     );
 
     const stopListening = useCallback(() => {
-        if (SpeechRecognition && isListening) {
+        if (recognitionRef.current) {
             try {
-                const recognition = new SpeechRecognition();
-                recognition.stop();
-                setIsListening(false);
+                recognitionRef.current.stop();
             } catch (err) {
                 // Already stopped
             }
+            recognitionRef.current = null;
         }
-    }, [SpeechRecognition, isListening]);
+        setIsListening(false);
+        setIsStarting(false);
+    }, []);
 
     const resetTranscript = useCallback(() => {
         setTranscript("");
@@ -118,6 +129,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     return {
         transcript,
         isListening,
+        isStarting,
         isSpeaking,
         error,
         startListening,
